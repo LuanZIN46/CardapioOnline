@@ -1,0 +1,184 @@
+// Cardápio Digital Online — SaaS multiempresa
+// Banco: PostgreSQL | ORM: Prisma
+//
+// Regra central de isolamento: toda tabela de domínio carrega `empresaId`.
+// Nenhuma consulta da aplicação pode omitir esse filtro.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Plano {
+  FREE
+  BASICO
+  PRO
+  ENTERPRISE
+}
+
+enum Cargo {
+  ADMIN
+  GERENTE
+  ATENDENTE
+}
+
+enum StatusPedido {
+  NOVO
+  EM_PREPARO
+  SAIU_PARA_ENTREGA
+  FINALIZADO
+  CANCELADO
+}
+
+enum StatusMesa {
+  LIVRE
+  OCUPADA
+  RESERVADA
+  INATIVA
+}
+
+model Empresa {
+  id        String   @id @default(uuid())
+  nome      String
+  telefone  String
+  email     String   @unique
+  plano     Plano    @default(FREE)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuarios   Usuario[]
+  categorias Categoria[]
+  produtos   Produto[]
+  pedidos    Pedido[]
+  mesas      Mesa[]
+
+  @@map("empresas")
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String
+  senha     String
+  cargo     Cargo    @default(ATENDENTE)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  // O e-mail é único dentro da empresa, permitindo o mesmo endereço em contas diferentes.
+  @@unique([empresaId, email])
+  @@index([empresaId])
+  @@map("usuarios")
+}
+
+model Categoria {
+  id        String   @id @default(uuid())
+  nome      String
+  ordem     Int      @default(0)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empresaId String
+  empresa   Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  produtos  Produto[]
+
+  @@unique([empresaId, nome])
+  @@index([empresaId])
+  @@map("categorias")
+}
+
+model Produto {
+  id         String   @id @default(uuid())
+  nome       String
+  descricao  String?
+  // Centavos: evita erro de arredondamento de ponto flutuante em dinheiro.
+  preco      Int
+  imagem     String?
+  disponivel Boolean  @default(true)
+  ordem      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  categoriaId String?
+  categoria   Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  itensPedido ItemPedido[]
+
+  @@index([empresaId])
+  @@index([empresaId, categoriaId])
+  @@map("produtos")
+}
+
+model Pedido {
+  id         String       @id @default(uuid())
+  numero     Int          @default(autoincrement())
+  cliente    String
+  telefone   String
+  endereco   String?
+  status     StatusPedido @default(NOVO)
+  observacao String?
+  // Total congelado no fechamento do pedido, em centavos.
+  valorTotal Int          @default(0)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  mesaId String?
+  mesa   Mesa?   @relation(fields: [mesaId], references: [id], onDelete: SetNull)
+
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  itens ItemPedido[]
+
+  @@index([empresaId])
+  @@index([empresaId, status])
+  @@index([empresaId, createdAt])
+  @@map("pedidos")
+}
+
+model ItemPedido {
+  id         String  @id @default(uuid())
+  quantidade Int
+  // Preço unitário no momento do pedido — não acompanha mudanças futuras do produto.
+  preco      Int
+  observacao String?
+
+  pedidoId String
+  pedido   Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  produtoId String
+  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+
+  @@index([pedidoId])
+  @@index([produtoId])
+  @@map("itens_pedido")
+}
+
+model Mesa {
+  id         String     @id @default(uuid())
+  numero     Int
+  status     StatusMesa @default(LIVRE)
+  capacidade Int?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  pedidos   Pedido[]
+
+  @@unique([empresaId, numero])
+  @@index([empresaId])
+  @@map("mesas")
+}

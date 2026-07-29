@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(git --version)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npx tailwindcss *)",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const i=require\\('./node_modules/lucide-react/dist/cjs/lucide-react.js'\\);const k=Object.keys\\(i\\);console.log\\(k.filter\\(n=>/insta|face|book|share|link|globe|at-?sign|AtSign/i.test\\(n\\)\\).slice\\(0,40\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node \"C:/Users/Luan/AppData/Local/Temp/claude/D--Cardapio/2863fb7d-2ee1-4f2a-9557-28767cb98fbb/scratchpad/gen-icons.mjs\")",
+      "Bash(npm run *)",
+      "Bash(ls -lt \"/c/Users/Luan/AppData/Local/Temp/claude\" 2>/dev/null | head -10; echo \"---pasted---\"; find \"/c/Users/Luan/AppData/Local/Temp\" -maxdepth 3 -iname \"*.png\" -newermt \"-2 hours\" 2>/dev/null | head -20)",
+      "Bash(find /c/Users/Luan/Downloads /c/Users/Luan/Desktop /c/Users/Luan/Pictures /d/Cardapio -maxdepth 3 \\\\\\( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.webp\" \\\\\\) -newermt \"-6 hours\" 2>/dev/null | head -20)",
+      "Bash(node -e \"const b=require\\('fs'\\).readFileSync\\('Logo.jfif'\\);console.log\\('magic:', b.subarray\\(0,4\\).toString\\('hex'\\), '| bytes:', b.length\\)\")",
+      "Bash(node scripts/generate-icons.mjs)",
+      "Bash(node -e ' *)",
+      "Bash(cp /tmp/mark-test.png \"C:/Users/Luan/AppData/Local/Temp/claude/D--Cardapio/2863fb7d-2ee1-4f2a-9557-28767cb98fbb/scratchpad/mark-test.png\")",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(psql --version)",
+      "Bash(mkdir -p /d/Cardapio/backend)",
+      "Bash(npm init *)",
+      "PowerShell(Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{n='UsedGB';e={[math]::Round\\($_.Used/1GB,1\\)}}, @{n='FreeGB';e={[math]::Round\\($_.Free/1GB,2\\)}} | Format-Table -AutoSize)",
+      "PowerShell($c = \"C:\\\\Users\\\\Luan\\\\AppData\\\\Local\\\\npm-cache\"; if \\(Test-Path $c\\) { $s = \\(Get-ChildItem $c -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum\\).Sum; \"npm-cache: {0:N2} GB\" -f \\($s/1GB\\) } else { \"sem cache\" })",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(Object.keys\\(p.dependencies||{}\\).join\\(', '\\)\\)\")",
+      "Bash(npx prisma *)"
+    ]
+  }
+}
