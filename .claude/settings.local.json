@@ -25,7 +25,8 @@
       "PowerShell(Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{n='UsedGB';e={[math]::Round\\($_.Used/1GB,1\\)}}, @{n='FreeGB';e={[math]::Round\\($_.Free/1GB,2\\)}} | Format-Table -AutoSize)",
       "PowerShell($c = \"C:\\\\Users\\\\Luan\\\\AppData\\\\Local\\\\npm-cache\"; if \\(Test-Path $c\\) { $s = \\(Get-ChildItem $c -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum\\).Sum; \"npm-cache: {0:N2} GB\" -f \\($s/1GB\\) } else { \"sem cache\" })",
       "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(Object.keys\\(p.dependencies||{}\\).join\\(', '\\)\\)\")",
-      "Bash(npx prisma *)"
+      "Bash(npx prisma *)",
+      "Bash(npm uninstall *)"
     ]
   }
 }

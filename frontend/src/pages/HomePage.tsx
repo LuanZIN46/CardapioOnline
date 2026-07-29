@@ -53,7 +53,10 @@ export default function HomePage() {
           current = category.id;
         }
       }
-      if (current) setActiveCategoryId(current);
+
+      // Acima da primeira seção nenhuma casa com o offset: volta para a categoria inicial.
+      const proxima = current || visibleCategories[0]?.id;
+      if (proxima) setActiveCategoryId(proxima);
     };
 
     window.addEventListener('scroll', onScroll, { passive: true });
