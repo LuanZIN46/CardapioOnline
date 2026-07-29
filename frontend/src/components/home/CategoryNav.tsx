@@ -12,8 +12,19 @@ export function CategoryNav({ categories, activeId, onSelect }: CategoryNavProps
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const active = listRef.current?.querySelector<HTMLElement>('[data-active="true"]');
-    active?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    const list = listRef.current;
+    const active = list?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!list || !active) return;
+
+    // Rola apenas o trilho horizontal. `scrollIntoView` mexeria também na rolagem
+    // da página e, com a barra sticky, jogava o usuário de volta ao topo.
+    const trilho = list.getBoundingClientRect();
+    const botao = active.getBoundingClientRect();
+    const deslocamento = botao.left - trilho.left - (trilho.width - botao.width) / 2;
+
+    if (Math.abs(deslocamento) > 1) {
+      list.scrollBy({ left: deslocamento, behavior: 'smooth' });
+    }
   }, [activeId]);
 
   return (
