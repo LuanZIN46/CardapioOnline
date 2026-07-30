@@ -22,7 +22,6 @@ export interface StoreSettings {
   facebook?: string;
   address: string;
   deliveryFee: Money;
-  minimumOrder: Money;
   pixKey: string;
   deliveryTimeMinutes: { min: number; max: number };
   pickupTimeMinutes: { min: number; max: number };

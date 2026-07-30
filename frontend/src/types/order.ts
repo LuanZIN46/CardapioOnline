@@ -18,13 +18,10 @@ export interface CustomerInfo {
 }
 
 export interface DeliveryAddress {
-  zipCode: string;
   street: string;
   number: string;
   neighborhood: string;
   city: string;
-  complement?: string;
-  reference?: string;
 }
 
 export interface OrderPayment {

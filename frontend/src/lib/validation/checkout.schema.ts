@@ -3,13 +3,10 @@ import { onlyDigits, parseCurrencyToCents } from '@/lib/format';
 import type { Money } from '@/types';
 
 const addressSchema = z.object({
-  zipCode: z.string().optional(),
   street: z.string().optional(),
   number: z.string().optional(),
   neighborhood: z.string().optional(),
   city: z.string().optional(),
-  complement: z.string().optional(),
-  reference: z.string().optional(),
 });
 
 export const baseCheckoutSchema = z.object({
@@ -20,7 +17,7 @@ export const baseCheckoutSchema = z.object({
     .max(80, 'Nome muito longo.'),
   phone: z
     .string()
-    .refine((value) => onlyDigits(value).length >= 10, 'Informe um telefone válido com DDD.'),
+    .refine((value) => onlyDigits(value).length >= 10, 'Informe um celular válido com DDD.'),
   orderType: z.enum(['delivery', 'pickup']),
   address: addressSchema,
   payment: z.enum(['pix', 'card', 'cash']),
@@ -38,6 +35,9 @@ const REQUIRED_ADDRESS_FIELDS = [
   { field: 'city', message: 'Informe a cidade.' },
 ] as const;
 
+/** Campos exigidos na etapa 1, usados para liberar o avanço do formulário. */
+export const STEP_ONE_FIELDS = ['name', 'phone'] as const;
+
 /** O total é injetado para validar se o troco informado cobre o valor do pedido. */
 export function createCheckoutSchema(total: Money) {
   return baseCheckoutSchema.superRefine((values, ctx) => {
@@ -46,14 +46,6 @@ export function createCheckoutSchema(total: Money) {
         if (!values.address?.[field]?.trim()) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['address', field], message });
         }
-      }
-
-      if (onlyDigits(values.address?.zipCode ?? '').length !== 8) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['address', 'zipCode'],
-          message: 'Informe um CEP válido.',
-        });
       }
     }
 

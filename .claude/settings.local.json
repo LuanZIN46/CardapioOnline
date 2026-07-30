@@ -40,7 +40,10 @@
       "Bash(npx vite *)",
       "Bash(rm -rf dist dist2)",
       "Bash(node extrair-pdf.mjs pedido-pix.pdf)",
-      "PowerShell($s = \"C:\\\\Users\\\\Luan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Cardapio\\\\2863fb7d-2ee1-4f2a-9557-28767cb98fbb\\\\scratchpad\"; Get-ChildItem $s -File | Select-Object Name; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddMinutes\\(-10\\) } | Stop-Process -Force -ErrorAction SilentlyContinue; \"receptores encerrados\")"
+      "PowerShell($s = \"C:\\\\Users\\\\Luan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Cardapio\\\\2863fb7d-2ee1-4f2a-9557-28767cb98fbb\\\\scratchpad\"; Get-ChildItem $s -File | Select-Object Name; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddMinutes\\(-10\\) } | Stop-Process -Force -ErrorAction SilentlyContinue; \"receptores encerrados\")",
+      "Bash(grep -vE \"only-export-components|^$\")",
+      "Bash(node extrair-pdf.mjs pedido-etapas.pdf)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddMinutes\\(-8\\) } | Stop-Process -Force -ErrorAction SilentlyContinue; \"receptores encerrados\")"
     ]
   }
 }
