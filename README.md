@@ -7,10 +7,19 @@ Mobile First, tema preto e dourado, instalável como PWA.
 
 ```
 Cardapio/
-├── frontend/     React 19 + TypeScript + Vite (implementado)
-├── backend/      Node + Express + Prisma (próxima etapa)
-└── database/     migrations e seeds do MySQL (próxima etapa)
+├── frontend/            React 19 + TypeScript + Vite — cardápio do cliente
+├── backend/             Node + Express + Prisma + PostgreSQL — API SaaS
+└── docker-compose.yml   PostgreSQL + API, com volumes persistentes
 ```
+
+## Subindo tudo com Docker
+
+```bash
+cp .env.example .env && docker compose up -d
+```
+
+Preencha `JWT_SECRET` no `.env` antes de subir. A API fica em `http://localhost:3333/api`
+e o banco em `localhost:5432`. Detalhes da API em [backend/README.md](backend/README.md).
 
 ## Rodando o frontend
 
@@ -41,7 +50,7 @@ Scripts disponíveis:
 - Bloqueio de checkout abaixo do pedido mínimo
 - Checkout validado com Zod: entrega ou retirada, endereço com busca automática por CEP, PIX / cartão / dinheiro com cálculo de troco
 - Cupons de desconto (`PARDAL10`, `FRETEGRATIS`, `PARDAL5`)
-- Mensagem formatada e envio direto para `wa.me/5514996440787`
+- Comprovante do pedido em PDF, compartilhado no WhatsApp `5514998580049`
 
 **Base técnica**
 - PWA instalável com service worker
@@ -67,13 +76,13 @@ Os dados do estabelecimento estão em [`frontend/src/data/settings.ts`](frontend
 nome, WhatsApp, taxa de entrega, pedido mínimo, chave PIX, endereço e horários por dia da semana.
 Cardápio, adicionais e cupons ficam nos demais arquivos de `src/data/`.
 
-Quando o backend entrar, basta trocar o corpo das funções de
-[`frontend/src/services/catalog.service.ts`](frontend/src/services/catalog.service.ts) por chamadas HTTP —
-o restante da aplicação não muda.
+O frontend ainda lê o cardápio desses arquivos locais. Para ligá-lo à API, troque o corpo das
+funções de [`frontend/src/services/catalog.service.ts`](frontend/src/services/catalog.service.ts)
+por chamadas HTTP — o restante da aplicação não muda.
 
 ## Próximas etapas
 
-1. Backend Express + Prisma + MySQL (produtos, categorias, adicionais, pedidos, cupons, configurações, horários)
-2. Autenticação JWT e painel administrativo
+1. Ligar o frontend à API (substituir os dados locais pelas rotas de `/produtos` e `/categorias`)
+2. Painel administrativo consumindo `/pedidos` e `/produtos`
 3. Pedidos em tempo real com Socket.IO
-4. Upload de imagens com Multer
+4. Adicionais, cupons e horários de funcionamento no banco (hoje vivem só no frontend)

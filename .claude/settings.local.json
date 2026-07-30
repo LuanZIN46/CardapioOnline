@@ -26,7 +26,21 @@
       "PowerShell($c = \"C:\\\\Users\\\\Luan\\\\AppData\\\\Local\\\\npm-cache\"; if \\(Test-Path $c\\) { $s = \\(Get-ChildItem $c -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum\\).Sum; \"npm-cache: {0:N2} GB\" -f \\($s/1GB\\) } else { \"sem cache\" })",
       "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(Object.keys\\(p.dependencies||{}\\).join\\(', '\\)\\)\")",
       "Bash(npx prisma *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(48\\).toString\\('base64url'\\)\\)\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3333 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Get-Process -Id $_.OwningProcess | Select-Object Id, ProcessName, StartTime })",
+      "PowerShell(Stop-Process -Id 23388 -Force -ErrorAction SilentlyContinue; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddHours\\(-1\\) } | Select-Object Id, StartTime)",
+      "Bash(node \"C:/Users/Luan/AppData/Local/Temp/claude/D--Cardapio/2863fb7d-2ee1-4f2a-9557-28767cb98fbb/scratchpad/teste-api.mjs\")",
+      "Read(//tmp/**)",
+      "Bash(head -30 /tmp/diff.err)",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\([...Object.keys\\(p.dependencies\\),...Object.keys\\(p.devDependencies\\)].filter\\(d=>/mysql|sequelize/i.test\\(d\\)\\).length===0?'nenhuma dependência MySQL declarada':'ACHOU MySQL'\\)\")",
+      "PowerShell($alvo = Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddHours\\(-2\\) }; $alvo | Select-Object Id, StartTime; $alvo | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; \"Restantes:\"; \\(Get-Process node -ErrorAction SilentlyContinue | Measure-Object\\).Count)",
+      "Bash(node extrair-pdf.mjs pedido.pdf)",
+      "Bash(node -e *)",
+      "Bash(npx vite *)",
+      "Bash(rm -rf dist dist2)",
+      "Bash(node extrair-pdf.mjs pedido-pix.pdf)",
+      "PowerShell($s = \"C:\\\\Users\\\\Luan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Cardapio\\\\2863fb7d-2ee1-4f2a-9557-28767cb98fbb\\\\scratchpad\"; Get-ChildItem $s -File | Select-Object Name; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddMinutes\\(-10\\) } | Stop-Process -Force -ErrorAction SilentlyContinue; \"receptores encerrados\")"
     ]
   }
 }

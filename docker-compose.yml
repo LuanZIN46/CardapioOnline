@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cardapio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cardapio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cardapio}
+      POSTGRES_DB: ${POSTGRES_DB:-cardapio}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # O backend só sobe depois que o banco aceita conexões.
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-cardapio} -d ${POSTGRES_DB:-cardapio}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: cardapio-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3333
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cardapio}:${POSTGRES_PASSWORD:-cardapio}@postgres:5432/${POSTGRES_DB:-cardapio}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no arquivo .env da raiz}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      UPLOAD_DIR: uploads
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-5}
+    ports:
+      - '${BACKEND_PORT:-3333}:3333'
+    volumes:
+      - uploads-data:/app/uploads
+    # Aplica as migrations pendentes antes de servir requisições.
+    command: sh -c "npx prisma migrate deploy && node dist/src/server.js"
+
+volumes:
+  postgres-data:
+  uploads-data:
