@@ -21,8 +21,6 @@ export function CartDrawer({ settings }: CartDrawerProps) {
   const clear = useCartStore((state) => state.clear);
   const { items, totals } = useCartTotals({ deliveryFee: settings.deliveryFee });
 
-  const missingForMinimum = settings.minimumOrder - totals.subtotal;
-  const belowMinimum = missingForMinimum > 0;
   const isEmpty = items.length === 0;
 
   const goToCheckout = () => {
@@ -67,16 +65,7 @@ export function CartDrawer({ settings }: CartDrawerProps) {
               </p>
             </div>
 
-            {belowMinimum && (
-              <p
-                role="status"
-                className="rounded-lg bg-brand-gold/10 px-3 py-2 text-center text-xs font-semibold text-brand-gold"
-              >
-                Faltam {formatCurrency(missingForMinimum)} para atingir o pedido mínimo.
-              </p>
-            )}
-
-            <Button size="lg" full disabled={belowMinimum} onClick={goToCheckout}>
+            <Button size="lg" full onClick={goToCheckout}>
               Finalizar pedido
               <ArrowRight className="h-5 w-5" aria-hidden />
             </Button>

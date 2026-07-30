@@ -34,11 +34,6 @@ export function maskPhone(input: string): string {
   return digits.replace(/^(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
 }
 
-export function maskZipCode(input: string): string {
-  const digits = input.replace(/\D/g, '').slice(0, 8);
-  return digits.length > 5 ? digits.replace(/^(\d{5})(\d{0,3})/, '$1-$2') : digits;
-}
-
 export function onlyDigits(input: string): string {
   return input.replace(/\D/g, '');
 }

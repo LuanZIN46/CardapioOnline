@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Bike, Clock, MessageCircle, ShoppingBasket } from 'lucide-react';
+import { Bike, Clock, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ProductImage } from '@/components/ui/ProductImage';
 import { formatCurrency, formatMinutesRange } from '@/lib/format';
@@ -57,21 +57,16 @@ export function HeroBanner({ settings, status }: HeroBannerProps) {
 
           <p className="mt-2 text-sm font-medium text-brand-white/70">{status.message}</p>
 
-          <dl className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          <dl className="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
             <InfoTile
               icon={<Clock className="h-4 w-4" />}
-              label="Entrega"
+              label="Entrega em"
               value={formatMinutesRange(settings.deliveryTimeMinutes)}
             />
             <InfoTile
               icon={<Bike className="h-4 w-4" />}
-              label="Taxa"
+              label="Taxa de entrega"
               value={formatCurrency(settings.deliveryFee)}
-            />
-            <InfoTile
-              icon={<ShoppingBasket className="h-4 w-4" />}
-              label="Mínimo"
-              value={formatCurrency(settings.minimumOrder)}
             />
           </dl>
 

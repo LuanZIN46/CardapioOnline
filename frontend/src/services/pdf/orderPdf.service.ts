@@ -451,15 +451,7 @@ function rotuloPagamento(order: OrderDocument): string {
 }
 
 function formatarEndereco(address: DeliveryAddress): string {
-  const partes = [
-    `${address.street}, ${address.number}`,
-    address.neighborhood,
-    address.city,
-    `CEP ${address.zipCode}`,
-  ];
-  if (address.complement) partes.push(address.complement);
-  if (address.reference) partes.push(`Ref.: ${address.reference}`);
-  return partes.join(' · ');
+  return [`${address.street}, ${address.number}`, address.neighborhood, address.city].join(' · ');
 }
 
 interface LogoCarregada {
