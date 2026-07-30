@@ -32,6 +32,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Dependências opcionais do jsPDF (usadas só por doc.html()/SVG).
+        // O código nunca as chama, então não vale baixar ~380 KB na instalação.
+        globIgnores: ['**/html2canvas-*.js', '**/purify.es-*.js', '**/index.es-*.js'],
         runtimeCaching: [
           {
             // Fotos pesadas (fachada, logo e imagens de produto) ficam fora do

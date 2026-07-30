@@ -7,9 +7,9 @@ import {
   Banknote,
   Bike,
   CreditCard,
+  FileText,
   QrCode,
   Store,
-  MessageCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
@@ -32,9 +32,11 @@ import {
   type CheckoutFormValues,
 } from '@/lib/validation/checkout.schema';
 import { lookupCep } from '@/services/cep.service';
-import { buildWhatsAppUrl, generateOrderCode } from '@/services/whatsapp.service';
+import { generateOrderPDF, type OrderDocument } from '@/services/pdf/orderPdf.service';
+import { generateOrderCode } from '@/services/whatsapp.service';
 import { getCartTotals } from '@/store/cart.selectors';
 import { useCartStore } from '@/store/cart.store';
+import { useLastOrderStore } from '@/store/last-order.store';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -42,6 +44,7 @@ export default function CheckoutPage() {
   const status = useStoreStatus(settings.openingHours);
   const clearCart = useCartStore((state) => state.clear);
   const couponCode = useCartStore((state) => state.couponCode);
+  const definirUltimoPedido = useLastOrderStore((state) => state.definir);
   const [lookingUpCep, setLookingUpCep] = useState(false);
 
   const {
@@ -104,9 +107,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const onSubmit = (values: CheckoutFormValues) => {
-    const url = buildWhatsAppUrl({
+  const onSubmit = async (values: CheckoutFormValues) => {
+    const order: OrderDocument = {
       orderCode: generateOrderCode(),
+      createdAt: new Date(),
       customer: { name: values.name.trim(), phone: values.phone },
       type: values.orderType,
       address:
@@ -133,11 +137,14 @@ export default function CheckoutPage() {
       couponCode,
       notes: values.notes?.trim() || undefined,
       settings,
-    });
+    };
 
-    const opened = window.open(url, '_blank', 'noopener');
-    if (!opened) {
-      toast('Libere os pop-ups para abrir o WhatsApp.', 'error');
+    try {
+      const pdf = await generateOrderPDF(order);
+      definirUltimoPedido(order, pdf);
+    } catch (erro) {
+      console.error('[pdf] falha ao gerar o comprovante', erro);
+      toast('Não conseguimos gerar o PDF. Tente novamente.', 'error');
       return;
     }
 
@@ -423,10 +430,13 @@ export default function CheckoutPage() {
           </div>
         </section>
 
-        <Button type="submit" variant="whatsapp" size="lg" full loading={isSubmitting}>
-          <MessageCircle className="h-5 w-5" aria-hidden />
-          Enviar pedido pelo WhatsApp
+        <Button type="submit" variant="primary" size="lg" full loading={isSubmitting}>
+          <FileText className="h-5 w-5" aria-hidden />
+          {isSubmitting ? 'Gerando comprovante...' : 'Gerar pedido em PDF'}
         </Button>
+        <p className="text-center text-xs text-brand-white/40">
+          Na próxima tela você envia o PDF para o WhatsApp do {settings.name}.
+        </p>
       </form>
     </main>
   );

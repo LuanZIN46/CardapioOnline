@@ -19,3 +19,9 @@ Thumbs.db
 .idea/
 
 uploads/
+
+# Prisma Client gerado — recriado por `npm run generate`
+backend/src/generated/
+
+# Cache local de instalação do npm (criado para não usar o disco C:)
+.npm-cache/
