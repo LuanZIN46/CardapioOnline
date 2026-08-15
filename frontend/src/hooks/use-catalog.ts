@@ -1,44 +1,55 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  fetchAddonGroups,
-  fetchCategories,
-  fetchProducts,
-  fetchSettings,
-} from '@/services/catalog.service';
+import { fetchCardapio, mesclarConfiguracoes } from '@/services/catalog.service';
 import { storeSettings } from '@/data/settings';
+import type { AddonGroup, Category, Product } from '@/types';
 
-const FIVE_MINUTES = 1000 * 60 * 5;
+const CINCO_MINUTOS = 1000 * 60 * 5;
+
+const VAZIO = {
+  categories: [] as Category[],
+  products: [] as Product[],
+  addonGroups: [] as AddonGroup[],
+};
+
+/**
+ * Uma única consulta traz categorias, produtos e adicionais.
+ * Os hooks abaixo apenas recortam esse resultado, então todos compartilham o
+ * mesmo cache e os mesmos estados de carregamento e erro.
+ */
+export function useCardapio() {
+  return useQuery({
+    queryKey: ['cardapio'],
+    queryFn: fetchCardapio,
+    staleTime: CINCO_MINUTOS,
+    retry: 1,
+  });
+}
 
 export function useCategories() {
-  return useQuery({
-    queryKey: ['categories'],
-    queryFn: fetchCategories,
-    staleTime: FIVE_MINUTES,
-  });
+  const query = useCardapio();
+  return { ...query, data: query.data?.categories ?? VAZIO.categories };
 }
 
 export function useProducts() {
-  return useQuery({
-    queryKey: ['products'],
-    queryFn: fetchProducts,
-    staleTime: FIVE_MINUTES,
-  });
+  const query = useCardapio();
+  return { ...query, data: query.data?.products ?? VAZIO.products };
 }
 
 export function useAddonGroups() {
-  return useQuery({
-    queryKey: ['addon-groups'],
-    queryFn: fetchAddonGroups,
-    staleTime: FIVE_MINUTES,
-  });
+  const query = useCardapio();
+  return { ...query, data: query.data?.addonGroups ?? VAZIO.addonGroups };
 }
 
+/**
+ * Dados do estabelecimento. Nome, endereço e horários ainda são locais;
+ * a taxa de entrega vem do banco, que é quem manda no cálculo do pedido.
+ */
 export function useStoreSettings() {
-  const query = useQuery({
-    queryKey: ['settings'],
-    queryFn: fetchSettings,
-    staleTime: FIVE_MINUTES,
-  });
+  const query = useCardapio();
 
-  return { ...query, settings: query.data ?? storeSettings };
+  return {
+    ...query,
+    settings:
+      query.data === undefined ? storeSettings : mesclarConfiguracoes(query.data.deliveryFee),
+  };
 }

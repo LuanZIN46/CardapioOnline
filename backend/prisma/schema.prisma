@@ -41,21 +41,38 @@ enum StatusMesa {
   INATIVA
 }
 
-model Empresa {
-  id        String   @id @default(uuid())
-  nome      String
-  telefone  String
-  email     String   @unique
-  plano     Plano    @default(FREE)
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum TipoPedido {
+  ENTREGA
+  RETIRADA
+}
 
-  usuarios   Usuario[]
-  categorias Categoria[]
-  produtos   Produto[]
-  pedidos    Pedido[]
-  mesas      Mesa[]
+enum FormaPagamento {
+  PIX
+  CARTAO
+  DINHEIRO
+}
+
+model Empresa {
+  id       String @id @default(uuid())
+  nome     String
+  /// Identificador do cardápio público: /api/publico/{slug}/cardapio
+  slug     String @unique
+  telefone String
+  email    String @unique
+  /// Taxa de entrega em centavos. Fica aqui para o servidor calcular o total
+  /// sem depender de nenhum valor enviado pelo navegador.
+  taxaEntrega Int      @default(0)
+  plano       Plano    @default(FREE)
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  usuarios         Usuario[]
+  categorias       Categoria[]
+  produtos         Produto[]
+  pedidos          Pedido[]
+  mesas            Mesa[]
+  gruposAdicionais GrupoAdicional[]
 
   @@map("empresas")
 }
@@ -80,10 +97,12 @@ model Usuario {
 }
 
 model Categoria {
-  id        String   @id @default(uuid())
-  nome      String
-  ordem     Int      @default(0)
-  ativo     Boolean  @default(true)
+  id    String @id @default(uuid())
+  nome  String
+  /// Emoji exibido na navegação do cardápio.
+  icone String?
+  ordem Int     @default(0)
+  ativo Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -97,14 +116,18 @@ model Categoria {
 }
 
 model Produto {
-  id         String   @id @default(uuid())
-  nome       String
-  descricao  String?
+  id          String   @id @default(uuid())
+  nome        String
+  descricao   String?
+  /// Composição exibida no modal do produto.
+  ingredientes String[]
+  /// Selos do card: "novo", "promocao", "mais-vendido".
+  badges       String[]
   // Centavos: evita erro de arredondamento de ponto flutuante em dinheiro.
-  preco      Int
-  imagem     String?
-  disponivel Boolean  @default(true)
-  ordem      Int      @default(0)
+  preco       Int
+  imagem      String?
+  disponivel  Boolean  @default(true)
+  ordem       Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -114,25 +137,95 @@ model Produto {
   empresaId String
   empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
-  itensPedido ItemPedido[]
+  itensPedido      ItemPedido[]
+  gruposAdicionais ProdutoGrupoAdicional[]
 
   @@index([empresaId])
   @@index([empresaId, categoriaId])
   @@map("produtos")
 }
 
+/// Conjunto de opções oferecido na montagem do produto (ex.: "Turbine seu lanche").
+model GrupoAdicional {
+  id             String   @id @default(uuid())
+  nome           String
+  descricao      String?
+  minSelecao     Int      @default(0)
+  maxSelecao     Int      @default(1)
+  permiteRepetir Boolean  @default(false)
+  ordem          Int      @default(0)
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  opcoes   Adicional[]
+  produtos ProdutoGrupoAdicional[]
+
+  @@unique([empresaId, nome])
+  @@index([empresaId])
+  @@map("grupos_adicionais")
+}
+
+model Adicional {
+  id         String   @id @default(uuid())
+  nome       String
+  /// Centavos. É este valor, e não o enviado pelo cliente, que entra na conta.
+  preco      Int
+  disponivel Boolean  @default(true)
+  ordem      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  grupoId String
+  grupo   GrupoAdicional @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+
+  itensPedido ItemPedidoAdicional[]
+
+  @@index([grupoId])
+  @@map("adicionais")
+}
+
+/// Quais grupos de adicionais aparecem em cada produto.
+model ProdutoGrupoAdicional {
+  produtoId String
+  grupoId   String
+  ordem     Int @default(0)
+
+  produto Produto        @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  grupo   GrupoAdicional @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+
+  @@id([produtoId, grupoId])
+  @@index([grupoId])
+  @@map("produtos_grupos_adicionais")
+}
+
 model Pedido {
-  id         String       @id @default(uuid())
-  numero     Int          @default(autoincrement())
-  cliente    String
-  telefone   String
-  endereco   String?
+  id       String     @id @default(uuid())
+  /// Número sequencial exibido na comanda.
+  numero   Int        @default(autoincrement())
+  cliente  String
+  telefone String
+  tipo     TipoPedido @default(ENTREGA)
+  /// Endereço já formatado; só preenchido quando o tipo é ENTREGA.
+  endereco String?
+
+  formaPagamento FormaPagamento @default(PIX)
+  /// Quanto o cliente vai entregar em dinheiro, quando precisa de troco.
+  trocoPara      Int?
+
   status     StatusPedido @default(NOVO)
   observacao String?
-  // Total congelado no fechamento do pedido, em centavos.
-  valorTotal Int          @default(0)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+
+  // Valores em centavos, todos calculados pelo servidor e congelados no fechamento.
+  subtotal    Int @default(0)
+  taxaEntrega Int @default(0)
+  valorTotal  Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   mesaId String?
   mesa   Mesa?   @relation(fields: [mesaId], references: [id], onDelete: SetNull)
@@ -151,8 +244,12 @@ model Pedido {
 model ItemPedido {
   id         String  @id @default(uuid())
   quantidade Int
-  // Preço unitário no momento do pedido — não acompanha mudanças futuras do produto.
+  // Preço unitário do produto no momento do pedido — não acompanha mudanças futuras.
   preco      Int
+  /// Nome congelado: a comanda continua legível mesmo se o produto for renomeado.
+  nome       String
+  /// (preço + adicionais) x quantidade, congelado.
+  subtotal   Int     @default(0)
   observacao String?
 
   pedidoId String
@@ -161,9 +258,30 @@ model ItemPedido {
   produtoId String
   produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Restrict)
 
+  adicionais ItemPedidoAdicional[]
+
   @@index([pedidoId])
   @@index([produtoId])
   @@map("itens_pedido")
+}
+
+/// Adicionais escolhidos em um item, com nome e preço congelados no fechamento.
+model ItemPedidoAdicional {
+  id         String @id @default(uuid())
+  quantidade Int
+  preco      Int
+  nome       String
+
+  itemPedidoId String
+  itemPedido   ItemPedido @relation(fields: [itemPedidoId], references: [id], onDelete: Cascade)
+
+  // O adicional pode ser excluído do cardápio sem levar o histórico junto.
+  adicionalId String?
+  adicional   Adicional? @relation(fields: [adicionalId], references: [id], onDelete: SetNull)
+
+  @@index([itemPedidoId])
+  @@index([adicionalId])
+  @@map("itens_pedido_adicionais")
 }
 
 model Mesa {

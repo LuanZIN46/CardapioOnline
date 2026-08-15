@@ -4,28 +4,36 @@ Backend SaaS multiempresa em Node.js + Express + Prisma + **PostgreSQL**.
 
 ## Subindo
 
-### Com Docker (recomendado)
+**O Docker é opcional.** O backend só precisa de uma `DATABASE_URL` apontando para
+qualquer PostgreSQL — instalado na máquina, na nuvem ou em contêiner. O
+`docker-compose.yml` da raiz é só uma conveniência.
 
-Na raiz do repositório:
+### 1. Escolha um PostgreSQL
 
-```bash
-cp .env.example .env && docker compose up -d
-```
+| Opção | Como | Quando usar |
+| --- | --- | --- |
+| **PostgreSQL local** | [Instalador oficial para Windows](https://www.postgresql.org/download/windows/). Dá para escolher o disco de instalação (útil se o C: estiver cheio). | Uso normal, dados persistentes |
+| **Postgres do Prisma** | `npx prisma dev` — sobe um servidor local e imprime a `DATABASE_URL` | Testes rápidos, sem instalar nada |
+| **Nuvem** | [Neon](https://neon.tech) ou [Supabase](https://supabase.com), planos gratuitos | Acessar de outra máquina, sem instalar nada |
+| **Docker** | `docker compose up -d` na raiz | Se já usa Docker |
 
-O compose sobe o PostgreSQL, aplica as migrations e inicia a API em `http://localhost:3333/api`.
-Preencha `JWT_SECRET` no `.env` antes — o compose recusa subir sem ele.
-
-### Sem Docker
-
-Com um PostgreSQL já rodando:
+### 2. Suba a API
 
 ```bash
 cp .env.example .env
+```
+
+Ajuste `DATABASE_URL` no `.env` e depois:
+
+```bash
 npm install
-npm run migrate
+npm run migrate:deploy
 npm run seed
 npm run dev
 ```
+
+A API sobe em `http://localhost:3333/api` e o cardápio público fica em
+`http://localhost:3333/api/publico/bar-do-pardal/cardapio`.
 
 ## Scripts
 
@@ -66,6 +74,40 @@ conhecendo o id do registro. Cada service filtra por `empresaId` antes de qualqu
 ## Endpoints
 
 Base: `/api`
+
+### Cardápio público (sem token)
+
+É o que o site do cliente consome. A empresa vem pelo `slug` na URL.
+
+| Método | Rota | O que faz |
+| --- | --- | --- |
+| GET | `/publico/:empresa/cardapio` | Categorias, produtos e adicionais numa resposta só |
+| POST | `/publico/:empresa/pedidos` | Recebe o pedido, calcula os valores e persiste |
+
+O `POST` recebe **apenas identificadores e quantidades**. Preço de produto, preço
+de adicional e taxa de entrega vêm do banco — o que o navegador enviar como valor
+é ignorado. A resposta traz o pedido salvo, incluindo o número da comanda.
+
+```jsonc
+// POST /publico/bar-do-pardal/pedidos
+{
+  "cliente": "Fabrício Alves",
+  "telefone": "14988776655",
+  "tipo": "ENTREGA",                    // ou "RETIRADA"
+  "endereco": { "rua": "...", "numero": "01", "bairro": "...", "cidade": "..." },
+  "formaPagamento": "DINHEIRO",         // PIX | CARTAO | DINHEIRO
+  "trocoPara": 10000,                   // centavos, só com DINHEIRO
+  "observacao": "Campainha quebrada",
+  "itens": [
+    {
+      "produtoId": "uuid",
+      "quantidade": 2,
+      "observacao": "Sem cebola",
+      "adicionais": [{ "adicionalId": "uuid", "quantidade": 1 }]
+    }
+  ]
+}
+```
 
 ### Auth
 | Método | Rota | Acesso |

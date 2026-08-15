@@ -5,12 +5,16 @@ import { empresaRoutes } from './empresa.routes.js';
 import { mesaRoutes } from './mesa.routes.js';
 import { pedidoRoutes } from './pedido.routes.js';
 import { produtoRoutes } from './produto.routes.js';
+import { publicoRoutes } from './publico.routes.js';
 
 export const routes = Router();
 
 routes.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Cardápio do cliente: sem autenticação, identificado pelo slug da empresa.
+routes.use('/publico', publicoRoutes);
 
 routes.use('/auth', authRoutes);
 routes.use('/empresa', empresaRoutes);

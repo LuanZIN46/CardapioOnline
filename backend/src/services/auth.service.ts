@@ -2,6 +2,7 @@ import { prisma } from '../config/prisma.js';
 import { AppError } from '../utils/AppError.js';
 import { gerarToken } from '../utils/jwt.js';
 import { conferirSenha, gerarHash } from '../utils/senha.js';
+import { slugDisponivel } from '../utils/slug.js';
 import type { Plano } from '../generated/prisma/enums.js';
 
 interface DadosRegistro {
@@ -38,9 +39,19 @@ export async function registrar(dados: DadosRegistro) {
 
   const senhaHash = await gerarHash(dados.usuario.senha);
 
+  // Endereço do cardápio público, derivado do nome e garantidamente único.
+  const slug = await slugDisponivel(dados.empresa.nome, async (candidato) => {
+    const existente = await prisma.empresa.findUnique({
+      where: { slug: candidato },
+      select: { id: true },
+    });
+    return existente !== null;
+  });
+
   const empresa = await prisma.empresa.create({
     data: {
       nome: dados.empresa.nome,
+      slug,
       telefone: dados.empresa.telefone,
       email: dados.empresa.email,
       plano: dados.empresa.plano ?? 'FREE',
@@ -56,6 +67,7 @@ export async function registrar(dados: DadosRegistro) {
     select: {
       id: true,
       nome: true,
+      slug: true,
       email: true,
       plano: true,
       usuarios: { select: usuarioPublico },
@@ -67,7 +79,13 @@ export async function registrar(dados: DadosRegistro) {
   return {
     token: gerarToken({ sub: usuario.id, empresaId: empresa.id, cargo: usuario.cargo }),
     usuario,
-    empresa: { id: empresa.id, nome: empresa.nome, email: empresa.email, plano: empresa.plano },
+    empresa: {
+      id: empresa.id,
+      nome: empresa.nome,
+      slug: empresa.slug,
+      email: empresa.email,
+      plano: empresa.plano,
+    },
   };
 }
 

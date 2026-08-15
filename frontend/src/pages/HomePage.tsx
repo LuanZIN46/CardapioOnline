@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CatalogError } from '@/components/home/CatalogError';
 import { CategoryNav } from '@/components/home/CategoryNav';
 import { HeroBanner } from '@/components/home/HeroBanner';
 import { ProductCard } from '@/components/home/ProductCard';
 import { ProductCardSkeleton } from '@/components/ui/Skeleton';
-import { useCategories, useProducts, useStoreSettings } from '@/hooks/use-catalog';
+import { useCardapio, useCategories, useProducts, useStoreSettings } from '@/hooks/use-catalog';
 import { useStoreStatus } from '@/hooks/use-store-status';
 import { useUiStore } from '@/store/ui.store';
 import type { Category, Product } from '@/types';
@@ -13,8 +14,10 @@ const SECTION_OFFSET_PX = 160;
 export default function HomePage() {
   const { settings } = useStoreSettings();
   const status = useStoreStatus(settings.openingHours);
-  const { data: categories = [], isLoading: loadingCategories } = useCategories();
-  const { data: products = [], isLoading: loadingProducts } = useProducts();
+  const cardapio = useCardapio();
+  const { data: categories = [] } = useCategories();
+  const { data: products = [] } = useProducts();
+  const carregando = cardapio.isPending;
   const openProduct = useUiStore((state) => state.openProduct);
 
   const [activeCategoryId, setActiveCategoryId] = useState('');
@@ -96,8 +99,16 @@ export default function HomePage() {
         </div>
       )}
 
+      {cardapio.isError ? (
+        <CatalogError
+          erro={cardapio.error}
+          aoTentarNovamente={() => void cardapio.refetch()}
+          carregando={cardapio.isFetching}
+        />
+      ) : (
+        <>
       <div className="pt-4">
-        {loadingCategories ? (
+        {carregando ? (
           <div className="container flex gap-2 py-3">
             {Array.from({ length: 5 }).map((_, index) => (
               <div key={index} className="skeleton h-10 w-28 rounded-full" />
@@ -113,7 +124,7 @@ export default function HomePage() {
       </div>
 
       <main className="container space-y-10 py-8 pb-32">
-        {loadingProducts
+        {carregando
           ? Array.from({ length: 4 }).map((_, index) => <ProductCardSkeleton key={index} />)
           : visibleCategories.map((category) => (
               <CategorySection
@@ -125,6 +136,8 @@ export default function HomePage() {
               />
             ))}
       </main>
+        </>
+      )}
     </>
   );
 }

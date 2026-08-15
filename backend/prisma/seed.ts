@@ -1,26 +1,31 @@
 /**
- * Popula o banco com uma empresa de demonstração.
- * Idempotente: rodar de novo não duplica registros.
+ * Popula o banco com o Bar do Pardal e seu cardápio real.
+ * Idempotente: rodar de novo atualiza os registros em vez de duplicar.
  *
  *   npm run seed
  */
 import { prisma } from '../src/config/prisma.js';
 import { gerarHash } from '../src/utils/senha.js';
+import { categoriasSeed, gruposAdicionaisSeed, produtosSeed } from './cardapio.js';
 
+const EMPRESA_SLUG = 'bar-do-pardal';
 const EMAIL_EMPRESA = 'contato@bardopardal.com.br';
 const EMAIL_ADMIN = 'admin@bardopardal.com.br';
 const SENHA_ADMIN = 'pardal2026';
+const TAXA_ENTREGA = 200;
 
 async function main(): Promise<void> {
   const senha = await gerarHash(SENHA_ADMIN);
 
   const empresa = await prisma.empresa.upsert({
-    where: { email: EMAIL_EMPRESA },
-    update: {},
+    where: { slug: EMPRESA_SLUG },
+    update: { taxaEntrega: TAXA_ENTREGA },
     create: {
       nome: 'Bar do Pardal',
+      slug: EMPRESA_SLUG,
       telefone: '14998580049',
       email: EMAIL_EMPRESA,
+      taxaEntrega: TAXA_ENTREGA,
       plano: 'PRO',
       usuarios: {
         create: { nome: 'Administrador', email: EMAIL_ADMIN, senha, cargo: 'ADMIN' },
@@ -29,53 +34,9 @@ async function main(): Promise<void> {
     select: { id: true, nome: true },
   });
 
-  const categorias = [
-    { nome: 'Lanches', ordem: 1 },
-    { nome: 'Porções', ordem: 2 },
-    { nome: 'Bebidas', ordem: 3 },
-  ];
-
-  for (const categoria of categorias) {
-    await prisma.categoria.upsert({
-      where: { empresaId_nome: { empresaId: empresa.id, nome: categoria.nome } },
-      update: { ordem: categoria.ordem },
-      create: { ...categoria, empresaId: empresa.id },
-    });
-  }
-
-  const lanches = await prisma.categoria.findFirstOrThrow({
-    where: { empresaId: empresa.id, nome: 'Lanches' },
-    select: { id: true },
-  });
-  const porcoes = await prisma.categoria.findFirstOrThrow({
-    where: { empresaId: empresa.id, nome: 'Porções' },
-    select: { id: true },
-  });
-  const bebidas = await prisma.categoria.findFirstOrThrow({
-    where: { empresaId: empresa.id, nome: 'Bebidas' },
-    select: { id: true },
-  });
-
-  // Preços em centavos.
-  const produtos = [
-    { nome: 'Pardal Classic', descricao: 'Blend 180g, queijo e molho da casa', preco: 3200, categoriaId: lanches.id },
-    { nome: 'Bacon Supremo', descricao: 'Duplo blend, bacon e cheddar', preco: 3990, categoriaId: lanches.id },
-    { nome: 'Batata com Cheddar', descricao: 'Serve 2 a 3 pessoas', preco: 4200, categoriaId: porcoes.id },
-    { nome: 'Coca-Cola Lata', descricao: '350ml gelada', preco: 700, categoriaId: bebidas.id },
-  ];
-
-  for (const [indice, produto] of produtos.entries()) {
-    const existente = await prisma.produto.findFirst({
-      where: { empresaId: empresa.id, nome: produto.nome },
-      select: { id: true },
-    });
-
-    if (existente) continue;
-
-    await prisma.produto.create({
-      data: { ...produto, ordem: indice + 1, empresaId: empresa.id },
-    });
-  }
+  const categoriaIds = await semearCategorias(empresa.id);
+  const grupoIds = await semearGrupos(empresa.id);
+  const produtos = await semearProdutos(empresa.id, categoriaIds, grupoIds);
 
   for (const numero of [1, 2, 3, 4]) {
     await prisma.mesa.upsert({
@@ -85,8 +46,121 @@ async function main(): Promise<void> {
     });
   }
 
-  console.log(`Seed concluído para "${empresa.nome}".`);
-  console.log(`Login: ${EMAIL_ADMIN} / ${SENHA_ADMIN}`);
+  console.log(`Seed concluído para "${empresa.nome}" (slug: ${EMPRESA_SLUG})`);
+  console.log(`  ${categoriaIds.size} categorias, ${produtos} produtos, ${grupoIds.size} grupos de adicionais`);
+  console.log(`  Login do painel: ${EMAIL_ADMIN} / ${SENHA_ADMIN}`);
+}
+
+async function semearCategorias(empresaId: string): Promise<Map<string, string>> {
+  const ids = new Map<string, string>();
+
+  for (const categoria of categoriasSeed) {
+    const registro = await prisma.categoria.upsert({
+      where: { empresaId_nome: { empresaId, nome: categoria.nome } },
+      update: { ordem: categoria.ordem, icone: categoria.icone, ativo: true },
+      create: { nome: categoria.nome, icone: categoria.icone, ordem: categoria.ordem, empresaId },
+      select: { id: true },
+    });
+    ids.set(categoria.slug, registro.id);
+  }
+
+  return ids;
+}
+
+async function semearGrupos(empresaId: string): Promise<Map<string, string>> {
+  const ids = new Map<string, string>();
+
+  for (const grupo of gruposAdicionaisSeed) {
+    const registro = await prisma.grupoAdicional.upsert({
+      where: { empresaId_nome: { empresaId, nome: grupo.nome } },
+      update: {
+        descricao: grupo.descricao,
+        minSelecao: grupo.minSelecao,
+        maxSelecao: grupo.maxSelecao,
+        permiteRepetir: grupo.permiteRepetir,
+        ordem: grupo.ordem,
+        ativo: true,
+      },
+      create: {
+        nome: grupo.nome,
+        descricao: grupo.descricao,
+        minSelecao: grupo.minSelecao,
+        maxSelecao: grupo.maxSelecao,
+        permiteRepetir: grupo.permiteRepetir,
+        ordem: grupo.ordem,
+        empresaId,
+      },
+      select: { id: true },
+    });
+
+    ids.set(grupo.slug, registro.id);
+
+    for (const [indice, opcao] of grupo.opcoes.entries()) {
+      const existente = await prisma.adicional.findFirst({
+        where: { grupoId: registro.id, nome: opcao.nome },
+        select: { id: true },
+      });
+
+      if (existente) {
+        await prisma.adicional.update({
+          where: { id: existente.id },
+          data: { preco: opcao.preco, ordem: indice + 1, disponivel: true },
+        });
+      } else {
+        await prisma.adicional.create({
+          data: { nome: opcao.nome, preco: opcao.preco, ordem: indice + 1, grupoId: registro.id },
+        });
+      }
+    }
+  }
+
+  return ids;
+}
+
+async function semearProdutos(
+  empresaId: string,
+  categoriaIds: Map<string, string>,
+  grupoIds: Map<string, string>,
+): Promise<number> {
+  for (const produto of produtosSeed) {
+    const categoriaId = categoriaIds.get(produto.categoria);
+    if (!categoriaId) throw new Error(`Categoria "${produto.categoria}" não semeada.`);
+
+    const dados = {
+      nome: produto.nome,
+      descricao: produto.descricao,
+      preco: produto.preco,
+      imagem: produto.imagem ?? null,
+      ingredientes: produto.ingredientes ?? [],
+      badges: produto.badges ?? [],
+      ordem: produto.ordem,
+      disponivel: true,
+      categoriaId,
+    };
+
+    const existente = await prisma.produto.findFirst({
+      where: { empresaId, nome: produto.nome },
+      select: { id: true },
+    });
+
+    const registro = existente
+      ? await prisma.produto.update({ where: { id: existente.id }, data: dados, select: { id: true } })
+      : await prisma.produto.create({ data: { ...dados, empresaId }, select: { id: true } });
+
+    // Revincula os grupos de adicionais do zero para refletir mudanças no cardápio.
+    await prisma.produtoGrupoAdicional.deleteMany({ where: { produtoId: registro.id } });
+
+    for (const [indice, slugGrupo] of (produto.grupos ?? []).entries()) {
+      const grupoId = grupoIds.get(slugGrupo);
+      if (!grupoId) throw new Error(`Grupo "${slugGrupo}" não semeado.`);
+
+      await prisma.produtoGrupoAdicional.create({
+        data: { produtoId: registro.id, grupoId, ordem: indice + 1 },
+      });
+    }
+  }
+
+  return produtosSeed.length;
 }
 
 main()

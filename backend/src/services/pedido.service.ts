@@ -130,26 +130,36 @@ export async function criar(empresaId: string, dados: DadosPedido) {
 
   if (dados.mesaId) await garantirMesaDaEmpresa(empresaId, dados.mesaId);
 
-  const precoPorId = new Map(produtos.map((produto) => [produto.id, produto.preco]));
+  const porId = new Map(produtos.map((produto) => [produto.id, produto]));
 
-  const itens = dados.itens.map((item) => ({
-    produtoId: item.produtoId,
-    quantidade: item.quantidade,
-    preco: precoPorId.get(item.produtoId)!,
-    observacao: item.observacao ?? null,
-  }));
+  const itens = dados.itens.map((item) => {
+    const produto = porId.get(item.produtoId)!;
+    return {
+      produtoId: produto.id,
+      // Nome e preço congelados: a comanda não muda se o cardápio mudar depois.
+      nome: produto.nome,
+      preco: produto.preco,
+      quantidade: item.quantidade,
+      subtotal: produto.preco * item.quantidade,
+      observacao: item.observacao ?? null,
+    };
+  });
 
-  const valorTotal = itens.reduce((total, item) => total + item.preco * item.quantidade, 0);
+  const subtotal = itens.reduce((total, item) => total + item.subtotal, 0);
 
   return prisma.pedido.create({
     data: {
       empresaId,
       cliente: dados.cliente,
       telefone: dados.telefone,
+      // Pedido lançado pelo balcão: sem taxa de entrega.
+      tipo: dados.endereco ? 'ENTREGA' : 'RETIRADA',
       endereco: dados.endereco ?? null,
       observacao: dados.observacao ?? null,
       mesaId: dados.mesaId ?? null,
-      valorTotal,
+      subtotal,
+      taxaEntrega: 0,
+      valorTotal: subtotal,
       itens: { create: itens },
     },
     select: camposPublicos,

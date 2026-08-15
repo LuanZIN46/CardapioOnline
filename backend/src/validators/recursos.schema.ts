@@ -23,6 +23,8 @@ export const atualizarEmpresaSchema = z
 
 export const criarCategoriaSchema = z.object({
   nome: textoObrigatorio('Nome'),
+  // Emoji exibido na navegação do cardápio público.
+  icone: z.string().trim().max(8).optional().nullable(),
   ordem: z.number().int().min(0).optional(),
   ativo: z.boolean().optional(),
 });

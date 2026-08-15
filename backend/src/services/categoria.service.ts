@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError.js';
 
 interface DadosCategoria {
   nome: string;
+  icone?: string | null;
   ordem?: number;
   ativo?: boolean;
 }
@@ -10,6 +11,7 @@ interface DadosCategoria {
 const camposPublicos = {
   id: true,
   nome: true,
+  icone: true,
   ordem: true,
   ativo: true,
   createdAt: true,

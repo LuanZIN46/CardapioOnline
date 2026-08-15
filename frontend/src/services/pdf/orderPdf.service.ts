@@ -1,29 +1,14 @@
 import { jsPDF } from 'jspdf';
 import { formatCurrency } from '@/lib/format';
-import { itemTotal, itemUnitTotal } from '@/lib/pricing';
-import type {
-  CartItem,
-  CartTotals,
-  CustomerInfo,
-  DeliveryAddress,
-  OrderPayment,
-  OrderType,
-  PaymentMethod,
-  StoreSettings,
-} from '@/types';
+import type { PedidoSalvo } from '../order.service';
+import type { StoreSettings } from '@/types';
 
-/** Tudo que o comprovante precisa. É o mesmo formato usado na mensagem do WhatsApp. */
+/**
+ * A comanda é montada a partir do pedido que o servidor gravou — nunca a
+ * partir do carrinho local. Assim o papel mostra exatamente o que está no banco.
+ */
 export interface OrderDocument {
-  orderCode: string;
-  createdAt: Date;
-  customer: CustomerInfo;
-  type: OrderType;
-  address?: DeliveryAddress;
-  payment: OrderPayment;
-  items: CartItem[];
-  totals: CartTotals;
-  couponCode?: string;
-  notes?: string;
+  pedido: PedidoSalvo;
   settings: StoreSettings;
 }
 
@@ -35,46 +20,58 @@ export interface GeneratedOrderPdf {
   objectUrl: string;
 }
 
-const PAYMENT_LABELS: Record<PaymentMethod, string> = {
-  pix: 'PIX',
-  card: 'Cartão (na entrega)',
-  cash: 'Dinheiro',
+const PAGAMENTO_LABEL: Record<PedidoSalvo['formaPagamento'], string> = {
+  PIX: 'PIX',
+  CARTAO: 'Cartão',
+  DINHEIRO: 'DINHEIRO',
 };
 
-/* Medidas em milímetros (A4 = 210 x 297). */
-const PAGE_WIDTH = 210;
-const MARGIN = 16;
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-const RIGHT_EDGE = PAGE_WIDTH - MARGIN;
-const PAGE_BOTTOM = 297 - MARGIN;
-
-const COR_TEXTO: [number, number, number] = [17, 17, 17];
-const COR_SUAVE: [number, number, number] = [110, 110, 110];
-const COR_LINHA: [number, number, number] = [210, 210, 210];
-const COR_DOURADO: [number, number, number] = [150, 122, 36];
+/** Número da comanda com zeros à esquerda, como na notinha do balcão. */
+function numeroComanda(numero: number): string {
+  return String(numero).padStart(3, '0');
+}
 
 /**
- * Monta o comprovante do pedido em PDF.
+ * Bobina térmica de 80mm (papel 80x30: 80mm de largura por 30m de rolo).
  *
- * A função é isolada de propósito: recebe o pedido pronto e devolve o arquivo,
- * sem tocar em estado da aplicação, rede ou navegação.
+ * A cabeça de impressão de uma impressora de 80mm cobre ~72mm centralizados,
+ * ou seja, de 4mm a 76mm. As margens laterais de 5mm mantêm todo o conteúdo
+ * dentro dessa faixa em qualquer modelo, sem risco de cortar a coluna de valores.
+ *
+ * A altura é calculada pelo conteúdo, então a página termina logo após o rodapé
+ * e não sobra papel em branco no arquivo.
+ */
+const LARGURA = 80;
+const MARGEM = 5;
+/** Folga no topo e no fim da bobina — o suficiente para o corte, sem desperdício. */
+const MARGEM_TOPO = 3.5;
+const MARGEM_FIM = 3;
+const DIREITA = LARGURA - MARGEM;
+const LARGURA_UTIL = LARGURA - MARGEM * 2;
+
+/* Colunas da tabela, alinhadas à direita a partir da margem esquerda. */
+const COL_QUANT = MARGEM + 32;
+const COL_UNIT = MARGEM + 52;
+const COL_TOTAL = DIREITA;
+
+const PRETO: [number, number, number] = [0, 0, 0];
+
+/**
+ * Gera a comanda do pedido em PDF, no formato da notinha do bar.
+ *
+ * O layout é desenhado duas vezes: a primeira apenas mede a altura final,
+ * a segunda desenha de verdade numa página do tamanho exato. Sem isso a
+ * bobina sairia com sobra em branco no fim.
  */
 export async function generateOrderPDF(order: OrderDocument): Promise<GeneratedOrderPdf> {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
-  doc.setFont('helvetica', 'normal');
+  const medidor = new jsPDF({ unit: 'mm', format: [LARGURA, 1000] });
+  const alturaFinal = desenhar(medidor, order) + MARGEM_FIM;
 
-  let y = MARGIN;
-
-  y = await desenharCabecalho(doc, order, y);
-  y = desenharDadosDoPedido(doc, order, y);
-  y = desenharCliente(doc, order, y);
-  y = desenharItens(doc, order, y);
-  y = desenharTotais(doc, order, y);
-  y = desenharObservacoes(doc, order, y);
-  desenharRodape(doc, order);
+  const doc = new jsPDF({ unit: 'mm', format: [LARGURA, alturaFinal], compress: true });
+  desenhar(doc, order);
 
   const blob = doc.output('blob');
-  const fileName = `pedido-${order.orderCode}.pdf`;
+  const fileName = `pedido-${numeroComanda(order.pedido.numero)}.pdf`;
   const file = new File([blob], fileName, { type: 'application/pdf' });
 
   return { blob, file, fileName, objectUrl: URL.createObjectURL(blob) };
@@ -84,428 +81,247 @@ export function revokeOrderPdf(pdf: GeneratedOrderPdf): void {
   URL.revokeObjectURL(pdf.objectUrl);
 }
 
+/** Desenha a comanda inteira e devolve a posição vertical final. */
+function desenhar(doc: jsPDF, order: OrderDocument): number {
+  doc.setTextColor(...PRETO);
+  let y = MARGEM_TOPO + 3;
+
+  y = cabecalho(doc, order, y);
+  y = identificacao(doc, order, y);
+  y = itens(doc, order, y);
+  y = totais(doc, order, y);
+  y = pagamento(doc, order, y);
+  y = observacoes(doc, order, y);
+  y = rodape(doc, y);
+
+  return y;
+}
+
 /* ------------------------------------------------------------------ blocos */
 
-async function desenharCabecalho(
-  doc: jsPDF,
-  order: OrderDocument,
-  yInicial: number,
-): Promise<number> {
-  const logo = await carregarLogo(order.settings.logoUrl);
-  let y = yInicial;
-
-  if (logo) {
-    const lado = 24;
-    doc.addImage(logo.dataUrl, logo.formato, MARGIN, y, lado, lado);
-    // Nome e contato ficam ao lado da logo.
-    const textoX = MARGIN + lado + 6;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(...COR_TEXTO);
-    doc.text(order.settings.name, textoX, y + 9);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...COR_SUAVE);
-    doc.text(order.settings.address, textoX, y + 15);
-    doc.text(`Telefone: ${order.settings.phone}`, textoX, y + 20);
-
-    y += lado;
-  } else {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
-    doc.setTextColor(...COR_TEXTO);
-    doc.text(order.settings.name, PAGE_WIDTH / 2, y + 8, { align: 'center' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...COR_SUAVE);
-    doc.text(order.settings.address, PAGE_WIDTH / 2, y + 14, { align: 'center' });
-    doc.text(`Telefone: ${order.settings.phone}`, PAGE_WIDTH / 2, y + 19, { align: 'center' });
-
-    y += 22;
-  }
-
-  return linhaDivisoria(doc, y + 5);
-}
-
-function desenharDadosDoPedido(doc: jsPDF, order: OrderDocument, yInicial: number): number {
-  const y = yInicial + 8;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(...COR_DOURADO);
-  doc.text(`PEDIDO #${order.orderCode}`, MARGIN, y);
-
-  const data = order.createdAt.toLocaleDateString('pt-BR');
-  const hora = order.createdAt.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
+function cabecalho(doc: jsPDF, order: OrderDocument, yInicial: number): number {
+  let y = texto(doc, order.settings.name, yInicial, {
+    negrito: true,
+    tamanho: 13,
+    alinhamento: 'centro',
   });
 
+  y = texto(doc, order.settings.address, y + 1, { tamanho: 7.5, alinhamento: 'centro' });
+  y = texto(doc, `Tel: ${order.settings.phone}`, y, { tamanho: 7.5, alinhamento: 'centro' });
+
+  return divisoria(doc, y + 2);
+}
+
+function identificacao(doc: jsPDF, order: OrderDocument, yInicial: number): number {
+  const { pedido } = order;
+
+  let y = texto(doc, `*** COMANDA: ${numeroComanda(pedido.numero)} ***`, yInicial + 3.5, {
+    negrito: true,
+    tamanho: 11,
+    alinhamento: 'centro',
+  });
+
+  y = divisoria(doc, y + 1.5) + 3.5;
+
+  const criadoEm = new Date(pedido.createdAt);
+  const data = criadoEm.toLocaleDateString('pt-BR');
+  const hora = criadoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  y = texto(doc, `${data} ${hora}`, y, { tamanho: 8 });
+  y = texto(doc, `Cliente: ${pedido.cliente}`, y, { negrito: true, tamanho: 9 });
+  y = texto(doc, `Tel: ${pedido.telefone}`, y, { tamanho: 8 });
+
+  y = texto(doc, pedido.tipo === 'ENTREGA' ? 'Entrega' : 'Retirada no balcão', y + 0.5, {
+    negrito: true,
+    tamanho: 9.5,
+  });
+
+  if (pedido.endereco) {
+    y = texto(doc, pedido.endereco, y, { tamanho: 8 });
+  }
+
+  return divisoria(doc, y + 1.5);
+}
+
+function itens(doc: jsPDF, order: OrderDocument, yInicial: number): number {
+  let y = yInicial + 3.5;
+
+  // Cabeçalho das colunas, como na comanda do balcão.
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...COR_TEXTO);
-  doc.text(`${data} às ${hora}`, RIGHT_EDGE, y, { align: 'right' });
+  doc.setFontSize(6.5);
+  doc.text('PRODUTO', MARGEM, y);
+  doc.text('QUANT.', COL_QUANT, y, { align: 'right' });
+  doc.text('UNIT.', COL_UNIT, y, { align: 'right' });
+  doc.text('TOTAL', COL_TOTAL, y, { align: 'right' });
 
-  const tipo = order.type === 'delivery' ? 'ENTREGA' : 'RETIRADA NO BALCÃO';
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...COR_SUAVE);
-  doc.text(tipo, RIGHT_EDGE, y + 5, { align: 'right' });
+  y = divisoria(doc, y + 1.5) + 4;
 
-  return y + 10;
-}
+  for (const item of order.pedido.itens) {
+    // Nome em caixa alta e negrito: é o que a cozinha precisa ler de longe.
+    y = texto(doc, item.nome, y, { negrito: true, tamanho: 10 });
 
-function desenharCliente(doc: jsPDF, order: OrderDocument, yInicial: number): number {
-  let y = linhaDivisoria(doc, yInicial) + 7;
-
-  y = tituloSecao(doc, 'CLIENTE', y);
-
-  const linhas: Array<[string, string]> = [
-    ['Nome', order.customer.name],
-    ['Telefone', order.customer.phone],
-    ['Pagamento', rotuloPagamento(order)],
-  ];
-
-  if (order.type === 'delivery' && order.address) {
-    linhas.push(['Endereço', formatarEndereco(order.address)]);
-  } else {
-    linhas.push(['Retirada', order.settings.address]);
-  }
-
-  for (const [rotulo, valor] of linhas) {
-    y = linhaRotuloValor(doc, rotulo, valor, y);
-  }
-
-  return y + 2;
-}
-
-function desenharItens(doc: jsPDF, order: OrderDocument, yInicial: number): number {
-  let y = linhaDivisoria(doc, yInicial) + 7;
-  y = tituloSecao(doc, 'ITENS DO PEDIDO', y);
-
-  // Cabeçalho da tabela
-  const colQtd = MARGIN;
-  const colItem = MARGIN + 12;
-  const colUnit = RIGHT_EDGE - 46;
-  const colSub = RIGHT_EDGE;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...COR_SUAVE);
-  doc.text('QTD', colQtd, y);
-  doc.text('PRODUTO', colItem, y);
-  doc.text('UNIT.', colUnit, y, { align: 'right' });
-  doc.text('SUBTOTAL', colSub, y, { align: 'right' });
-  y += 2.5;
-  y = linhaDivisoria(doc, y) + 5;
-
-  doc.setTextColor(...COR_TEXTO);
-
-  for (const item of order.items) {
-    y = garantirEspaco(doc, y, 14);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text(`${item.quantity}x`, colQtd, y);
-
-    // O nome pode quebrar em várias linhas sem invadir a coluna de preços.
-    const larguraNome = colUnit - colItem - 8;
-    const nomeLinhas = doc.splitTextToSize(item.name, larguraNome) as string[];
-    doc.text(nomeLinhas[0] ?? item.name, colItem, y);
+    const unitario = item.quantidade > 0 ? Math.round(item.subtotal / item.quantidade) : item.preco;
 
     doc.setFont('helvetica', 'normal');
-    doc.text(formatCurrency(itemUnitTotal(item)), colUnit, y, { align: 'right' });
-    doc.setFont('helvetica', 'bold');
-    doc.text(formatCurrency(itemTotal(item)), colSub, y, { align: 'right' });
-
-    y += 4.5;
-
-    for (const linhaExtra of nomeLinhas.slice(1)) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text(linhaExtra, colItem, y);
-      y += 4.5;
-    }
-
-    y = desenharDetalhesDoItem(doc, item, colItem, larguraNome, y);
-    y += 2;
-  }
-
-  return y;
-}
-
-function desenharDetalhesDoItem(
-  doc: jsPDF,
-  item: CartItem,
-  x: number,
-  largura: number,
-  yInicial: number,
-): number {
-  let y = yInicial;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...COR_SUAVE);
-
-  for (const addon of item.addons) {
-    y = garantirEspaco(doc, y, 6);
-    const quantidade = addon.quantity > 1 ? ` (${addon.quantity}x)` : '';
-    const preco = addon.price > 0 ? ` — ${formatCurrency(addon.price * addon.quantity)}` : '';
-    doc.text(`+ ${addon.name}${quantidade}${preco}`, x + 2, y);
+    doc.setFontSize(8.5);
+    doc.text(quantidade(item.quantidade), COL_QUANT, y, { align: 'right' });
+    doc.text(valor(unitario), COL_UNIT, y, { align: 'right' });
+    doc.text(valor(item.subtotal), COL_TOTAL, y, { align: 'right' });
     y += 4;
-  }
 
-  if (item.notes) {
-    const linhas = doc.splitTextToSize(`Obs.: ${item.notes}`, largura) as string[];
-    for (const linha of linhas) {
-      y = garantirEspaco(doc, y, 6);
-      doc.text(linha, x + 2, y);
-      y += 4;
+    for (const adicional of item.adicionais) {
+      const vezes = adicional.quantidade > 1 ? ` (${adicional.quantidade}x)` : '';
+      y = texto(doc, `+ ${adicional.nome}${vezes}`, y, {
+        negrito: true,
+        tamanho: 8.5,
+        recuo: 3,
+      });
     }
+
+    if (item.observacao) {
+      y = texto(doc, `OBS: ${item.observacao}`, y, {
+        negrito: true,
+        tamanho: 8.5,
+        recuo: 3,
+      });
+    }
+
+    y = divisoria(doc, y + 1) + 3.5;
   }
 
-  doc.setTextColor(...COR_TEXTO);
-  return y;
+  return y - 3.5;
 }
 
-function desenharTotais(doc: jsPDF, order: OrderDocument, yInicial: number): number {
-  let y = garantirEspaco(doc, yInicial, 42);
-  y = linhaDivisoria(doc, y) + 7;
+function totais(doc: jsPDF, order: OrderDocument, yInicial: number): number {
+  const { pedido } = order;
+  let y = yInicial + 3.5;
 
-  const { totals, type, couponCode } = order;
+  y = linhaValor(doc, 'Subtotal', valor(pedido.subtotal), y);
 
-  y = linhaTotal(doc, 'Subtotal', formatCurrency(totals.subtotal), y);
-
-  if (type === 'delivery') {
-    y = linhaTotal(
+  if (pedido.tipo === 'ENTREGA') {
+    y = linhaValor(
       doc,
       'Taxa de entrega',
-      totals.deliveryFee === 0 ? 'Grátis' : formatCurrency(totals.deliveryFee),
-      y,
-    );
-  } else {
-    y = linhaTotal(doc, 'Retirada no balcão', 'Sem taxa', y);
-  }
-
-  if (totals.discount > 0) {
-    y = linhaTotal(
-      doc,
-      `Desconto${couponCode ? ` (${couponCode})` : ''}`,
-      `- ${formatCurrency(totals.discount)}`,
+      pedido.taxaEntrega === 0 ? 'GRÁTIS' : valor(pedido.taxaEntrega),
       y,
     );
   }
 
-  // Total destacado numa faixa.
-  y += 2;
-  doc.setFillColor(245, 241, 227);
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 12, 'F');
+  y = divisoria(doc, y) + 5;
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...COR_TEXTO);
-  doc.text('TOTAL', MARGIN + 4, y + 8);
-  doc.setFontSize(14);
-  doc.setTextColor(...COR_DOURADO);
-  doc.text(formatCurrency(totals.total), RIGHT_EDGE - 4, y + 8, { align: 'right' });
+  doc.setFontSize(13);
+  doc.text('TOTAL', MARGEM, y);
+  doc.text(formatCurrency(pedido.valorTotal), DIREITA, y, { align: 'right' });
 
-  y += 14;
+  return divisoria(doc, y + 2);
+}
 
-  if (order.payment.method === 'cash' && order.payment.changeFor) {
-    const troco = order.payment.changeFor - totals.total;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(...COR_TEXTO);
-    doc.text(
-      `Troco para ${formatCurrency(order.payment.changeFor)}` +
-        (troco > 0 ? ` — levar ${formatCurrency(troco)}` : ''),
-      RIGHT_EDGE,
-      y + 4,
-      { align: 'right' },
-    );
-    y += 7;
+function pagamento(doc: jsPDF, order: OrderDocument, yInicial: number): number {
+  const { pedido } = order;
+
+  let y = texto(doc, `PAGAMENTO: ${PAGAMENTO_LABEL[pedido.formaPagamento]}`, yInicial + 3.5, {
+    negrito: true,
+    tamanho: 9.5,
+  });
+
+  if (pedido.formaPagamento === 'DINHEIRO' && pedido.trocoPara) {
+    const troco = pedido.trocoPara - pedido.valorTotal;
+    const complemento = troco > 0 ? ` - levar ${formatCurrency(troco)}` : '';
+    y = texto(doc, `Troco para ${formatCurrency(pedido.trocoPara)}${complemento}`, y, {
+      tamanho: 8,
+    });
   }
 
-  if (order.payment.method === 'pix') {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(...COR_SUAVE);
-    doc.text(`Chave PIX: ${order.settings.pixKey}`, RIGHT_EDGE, y + 4, { align: 'right' });
-    y += 7;
+  if (pedido.formaPagamento === 'PIX') {
+    y = texto(doc, `Chave PIX: ${order.settings.pixKey}`, y, { tamanho: 8 });
   }
 
-  return y;
+  return divisoria(doc, y + 1.5);
 }
 
-function desenharObservacoes(doc: jsPDF, order: OrderDocument, yInicial: number): number {
-  if (!order.notes) return yInicial;
+function observacoes(doc: jsPDF, order: OrderDocument, yInicial: number): number {
+  const nota = order.pedido.observacao;
+  if (!nota) return yInicial;
 
-  let y = garantirEspaco(doc, yInicial + 4, 24);
-  y = linhaDivisoria(doc, y) + 7;
-  y = tituloSecao(doc, 'OBSERVAÇÕES', y);
+  let y = texto(doc, 'Observações', yInicial + 3.5, { negrito: true, tamanho: 9 });
+  y = texto(doc, nota, y, { negrito: true, tamanho: 9 });
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...COR_TEXTO);
-
-  const linhas = doc.splitTextToSize(order.notes, CONTENT_WIDTH) as string[];
-  for (const linha of linhas) {
-    y = garantirEspaco(doc, y, 8);
-    doc.text(linha, MARGIN, y);
-    y += 5;
-  }
-
-  return y;
+  return divisoria(doc, y + 1.5);
 }
 
-function desenharRodape(doc: jsPDF, order: OrderDocument): void {
-  const totalPaginas = doc.getNumberOfPages();
-
-  for (let pagina = 1; pagina <= totalPaginas; pagina += 1) {
-    doc.setPage(pagina);
-
-    doc.setDrawColor(...COR_LINHA);
-    doc.setLineWidth(0.2);
-    doc.line(MARGIN, PAGE_BOTTOM - 8, RIGHT_EDGE, PAGE_BOTTOM - 8);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(...COR_SUAVE);
-    doc.text('Pedido gerado automaticamente pelo sistema.', MARGIN, PAGE_BOTTOM - 3);
-
-    if (totalPaginas > 1) {
-      doc.text(`Página ${pagina} de ${totalPaginas}`, RIGHT_EDGE, PAGE_BOTTOM - 3, {
-        align: 'right',
-      });
-    } else {
-      doc.text(order.settings.name, RIGHT_EDGE, PAGE_BOTTOM - 3, { align: 'right' });
-    }
-  }
+function rodape(doc: jsPDF, yInicial: number): number {
+  return texto(doc, 'Pedido gerado automaticamente pelo sistema.', yInicial + 4, {
+    tamanho: 6.5,
+    alinhamento: 'centro',
+  });
 }
 
-/* ---------------------------------------------------------------- auxiliares */
+/* ---------------------------------------------------------------- desenho */
 
-function linhaDivisoria(doc: jsPDF, y: number): number {
-  doc.setDrawColor(...COR_LINHA);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, y, RIGHT_EDGE, y);
-  return y;
+interface OpcoesTexto {
+  negrito?: boolean;
+  tamanho?: number;
+  alinhamento?: 'esquerda' | 'centro';
+  /** Deslocamento à esquerda, usado nos adicionais e observações do item. */
+  recuo?: number;
 }
-
-function tituloSecao(doc: jsPDF, texto: string, y: number): number {
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...COR_DOURADO);
-  doc.text(texto, MARGIN, y);
-  return y + 6;
-}
-
-function linhaRotuloValor(doc: jsPDF, rotulo: string, valor: string, yInicial: number): number {
-  let y = garantirEspaco(doc, yInicial, 10);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(...COR_SUAVE);
-  doc.text(`${rotulo}:`, MARGIN, y);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...COR_TEXTO);
-
-  const x = MARGIN + 26;
-  const linhas = doc.splitTextToSize(valor, CONTENT_WIDTH - 26) as string[];
-
-  for (const [indice, linha] of linhas.entries()) {
-    if (indice > 0) y = garantirEspaco(doc, y, 8);
-    doc.text(linha, x, y);
-    y += 5;
-  }
-
-  return y;
-}
-
-function linhaTotal(doc: jsPDF, rotulo: string, valor: string, y: number): number {
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...COR_TEXTO);
-  doc.text(rotulo, MARGIN, y);
-  doc.text(valor, RIGHT_EDGE, y, { align: 'right' });
-  return y + 5.5;
-}
-
-/** Abre nova página quando o bloco não cabe no espaço restante. */
-function garantirEspaco(doc: jsPDF, y: number, alturaNecessaria: number): number {
-  if (y + alturaNecessaria <= PAGE_BOTTOM - 12) return y;
-  doc.addPage();
-  return MARGIN;
-}
-
-function rotuloPagamento(order: OrderDocument): string {
-  const base = PAYMENT_LABELS[order.payment.method];
-  if (order.payment.method !== 'cash') return base;
-  return order.payment.changeFor
-    ? `${base} — troco para ${formatCurrency(order.payment.changeFor)}`
-    : `${base} — não precisa de troco`;
-}
-
-function formatarEndereco(address: DeliveryAddress): string {
-  return [`${address.street}, ${address.number}`, address.neighborhood, address.city].join(' · ');
-}
-
-interface LogoCarregada {
-  dataUrl: string;
-  formato: 'JPEG';
-}
-
-/** A logo é exibida a 24 mm; ~300 DPI nesse tamanho dá cerca de 280 px. */
-const LOGO_PX = 280;
 
 /**
- * Converte a logo em data URL para embutir no PDF, reduzindo a resolução.
- * Embutir o arquivo original (1254px) deixaria o PDF em centenas de KB sem
- * ganho visual nenhum. Falha silenciosa: sem logo o cabeçalho centraliza o nome.
+ * Escreve o texto quebrando em várias linhas quando não couber na bobina.
+ *
+ * Tudo sai em caixa alta: é a única passagem por onde o texto da comanda entra,
+ * então quem chama não precisa lembrar de converter.
  */
-async function carregarLogo(url: string): Promise<LogoCarregada | null> {
-  try {
-    const imagem = await carregarImagem(url);
+function texto(doc: jsPDF, conteudo: string, y: number, opcoes: OpcoesTexto = {}): number {
+  const { negrito = false, tamanho = 8, alinhamento = 'esquerda', recuo = 0 } = opcoes;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = LOGO_PX;
-    canvas.height = LOGO_PX;
+  doc.setFont('helvetica', negrito ? 'bold' : 'normal');
+  doc.setFontSize(tamanho);
 
-    const contexto = canvas.getContext('2d');
-    if (!contexto) return null;
+  const x = alinhamento === 'centro' ? LARGURA / 2 : MARGEM + recuo;
+  const linhas = doc.splitTextToSize(maiusculas(conteudo), LARGURA_UTIL - recuo) as string[];
+  const alturaLinha = tamanho * 0.42;
 
-    // JPEG não tem transparência, então o fundo acompanha o tema escuro da marca.
-    contexto.fillStyle = '#111111';
-    contexto.fillRect(0, 0, LOGO_PX, LOGO_PX);
-
-    // Mantém a proporção original dentro do quadrado.
-    const escala = Math.min(LOGO_PX / imagem.width, LOGO_PX / imagem.height);
-    const largura = imagem.width * escala;
-    const altura = imagem.height * escala;
-    contexto.drawImage(
-      imagem,
-      (LOGO_PX - largura) / 2,
-      (LOGO_PX - altura) / 2,
-      largura,
-      altura,
-    );
-
-    return { dataUrl: canvas.toDataURL('image/jpeg', 0.82), formato: 'JPEG' };
-  } catch {
-    return null;
+  let cursor = y;
+  for (const linha of linhas) {
+    doc.text(linha, x, cursor, alinhamento === 'centro' ? { align: 'center' } : undefined);
+    cursor += alturaLinha;
   }
+
+  return cursor;
 }
 
-function carregarImagem(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const imagem = new Image();
-    imagem.crossOrigin = 'anonymous';
-    imagem.onload = () => resolve(imagem);
-    imagem.onerror = () => reject(new Error(`falha ao carregar ${url}`));
-    imagem.src = url;
-  });
+/** Linha pontilhada, igual à da comanda impressa. */
+function divisoria(doc: jsPDF, y: number): number {
+  doc.setLineDashPattern([0.6, 0.6], 0);
+  doc.setLineWidth(0.2);
+  doc.line(MARGEM, y, DIREITA, y);
+  doc.setLineDashPattern([], 0);
+  return y;
+}
+
+function linhaValor(doc: jsPDF, rotulo: string, montante: string, y: number): number {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(maiusculas(rotulo), MARGEM, y);
+  doc.text(montante, DIREITA, y, { align: 'right' });
+  return y + 4;
+}
+
+/** Caixa alta preservando acentos: "Porções" vira "PORÇÕES". */
+function maiusculas(conteudo: string): string {
+  return conteudo.toLocaleUpperCase('pt-BR');
+}
+
+/* --------------------------------------------------------------- valores */
+
+/** Valor sem o "R$", como aparece nas colunas da comanda. */
+function valor(centavos: number): string {
+  return (centavos / 100).toFixed(2).replace('.', ',');
+}
+
+/** Quantidade com 3 casas, no mesmo padrão do sistema do balcão. */
+function quantidade(unidades: number): string {
+  return unidades.toFixed(3).replace('.', ',');
 }

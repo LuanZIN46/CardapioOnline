@@ -43,7 +43,24 @@
       "PowerShell($s = \"C:\\\\Users\\\\Luan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Cardapio\\\\2863fb7d-2ee1-4f2a-9557-28767cb98fbb\\\\scratchpad\"; Get-ChildItem $s -File | Select-Object Name; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddMinutes\\(-10\\) } | Stop-Process -Force -ErrorAction SilentlyContinue; \"receptores encerrados\")",
       "Bash(grep -vE \"only-export-components|^$\")",
       "Bash(node extrair-pdf.mjs pedido-etapas.pdf)",
-      "PowerShell(Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddMinutes\\(-8\\) } | Stop-Process -Force -ErrorAction SilentlyContinue; \"receptores encerrados\")"
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddMinutes\\(-8\\) } | Stop-Process -Force -ErrorAction SilentlyContinue; \"receptores encerrados\")",
+      "Bash(grep -vE \"only-export-components|^$|^>\")",
+      "Bash(curl -s \"http://localhost:5173/src/services/pdf/orderPdf.service.ts\")",
+      "Bash(node extrair-pdf.mjs comanda.pdf)",
+      "Bash(node extrair-pdf.mjs comanda-real.pdf)",
+      "Bash(curl -s -m 8 http://localhost:3333/api/health)",
+      "Bash(curl -s -m 8 \"http://localhost:3333/api/publico/bar-do-pardal/cardapio\")",
+      "Bash(node \"C:/Users/Luan/AppData/Local/Temp/claude/D--Cardapio/2863fb7d-2ee1-4f2a-9557-28767cb98fbb/scratchpad/teste-publico.mjs\")",
+      "Bash(python -)",
+      "Bash(rm -f src/data/products.ts src/data/categories.ts src/data/addons.ts src/services/http.ts)",
+      "Bash(grep -vE \"only-export-components|^>|^$\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3333 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 2; \"API derrubada\")",
+      "Bash(node \"C:/Users/Luan/AppData/Local/Temp/claude/D--Cardapio/2863fb7d-2ee1-4f2a-9557-28767cb98fbb/scratchpad/teste-admin.mjs\")",
+      "Bash(curl -s \"http://localhost:3333/api/publico/bar-do-pardal/cardapio\")",
+      "Bash(TOKEN=$\\(curl -s -X POST http://localhost:3333/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@bardopardal.com.br\",\"senha\":\"pardal2026\"}' | node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\).on\\('end',\\(\\)=>console.log\\(JSON.parse\\(d\\).token\\)\\)\"\\) *)",
+      "Bash(curl -s -m 6 \"http://localhost:3333/api/publico/bar-do-pardal/cardapio\")",
+      "Bash(curl -s -m 6 -X POST http://localhost:3333/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@bardopardal.com.br\",\"senha\":\"pardal2026\"}')",
+      "Bash(node extrair-pdf.mjs medida2.pdf)"
     ]
   }
 }

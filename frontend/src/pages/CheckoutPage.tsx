@@ -18,18 +18,27 @@ import { OptionCard } from '@/components/ui/OptionCard';
 import { toast } from '@/components/ui/Toaster';
 import { CouponField } from '@/components/checkout/CouponField';
 import { StepIndicator } from '@/components/checkout/StepIndicator';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCartTotals } from '@/hooks/use-cart';
 import { useStoreSettings } from '@/hooks/use-catalog';
 import { useStoreStatus } from '@/hooks/use-store-status';
-import { formatCurrency, maskCurrency, maskPhone, parseCurrencyToCents } from '@/lib/format';
+import {
+  formatCurrency,
+  maskCurrency,
+  maskPhone,
+  maskZipCode,
+  parseCurrencyToCents,
+} from '@/lib/format';
 import { itemTotal } from '@/lib/pricing';
 import {
   createCheckoutSchema,
   STEP_ONE_FIELDS,
   type CheckoutFormValues,
 } from '@/lib/validation/checkout.schema';
+import { ApiError } from '@/services/api';
+import { buscarCep, cepCompleto } from '@/services/cep.service';
+import { enviarPedido, type PedidoSalvo } from '@/services/order.service';
 import { generateOrderPDF, type OrderDocument } from '@/services/pdf/orderPdf.service';
-import { generateOrderCode } from '@/services/whatsapp.service';
 import { getCartTotals } from '@/store/cart.selectors';
 import { useCartStore } from '@/store/cart.store';
 import { useLastOrderStore } from '@/store/last-order.store';
@@ -43,7 +52,15 @@ export default function CheckoutPage() {
   const clearCart = useCartStore((state) => state.clear);
   const couponCode = useCartStore((state) => state.couponCode);
   const definirUltimoPedido = useLastOrderStore((state) => state.definir);
+  const queryClient = useQueryClient();
+
+  /** Puxa o cardápio de novo quando o servidor avisa que algo mudou. */
+  const recarregarCardapio = () => {
+    void queryClient.invalidateQueries({ queryKey: ['cardapio'] });
+  };
   const [etapa, setEtapa] = useState<Etapa>(1);
+  const [dicaDoCep, setDicaDoCep] = useState('');
+  const ultimoCepBuscado = useRef('');
 
   const {
     register,
@@ -51,6 +68,7 @@ export default function CheckoutPage() {
     control,
     watch,
     setValue,
+    setFocus,
     trigger,
     formState: { errors, isSubmitting },
   } = useForm<CheckoutFormValues>({
@@ -58,7 +76,7 @@ export default function CheckoutPage() {
       name: '',
       phone: '',
       orderType: 'delivery',
-      address: { street: '', number: '', neighborhood: '', city: '' },
+      address: { zipCode: '', street: '', number: '', neighborhood: '', city: '' },
       payment: 'pix',
       needsChange: false,
       changeFor: '',
@@ -109,46 +127,86 @@ export default function CheckoutPage() {
   };
 
   const onSubmit = async (values: CheckoutFormValues) => {
-    const order: OrderDocument = {
-      orderCode: generateOrderCode(),
-      createdAt: new Date(),
-      customer: { name: values.name.trim(), phone: values.phone },
-      type: values.orderType,
-      address:
-        values.orderType === 'delivery'
-          ? {
-              street: values.address.street ?? '',
-              number: values.address.number ?? '',
-              neighborhood: values.address.neighborhood ?? '',
-              city: values.address.city ?? '',
-            }
-          : undefined,
-      payment: {
-        method: values.payment,
-        changeFor:
-          values.payment === 'cash' && values.needsChange
-            ? parseCurrencyToCents(values.changeFor ?? '')
-            : undefined,
-      },
-      items,
-      totals,
-      couponCode,
-      notes: values.notes?.trim() || undefined,
-      settings,
-    };
+    // O pedido vai primeiro ao servidor: é ele quem calcula os valores e devolve
+    // o número da comanda. Só depois a comanda em PDF é montada com essa resposta.
+    let pedido: PedidoSalvo;
 
     try {
-      const pdf = await generateOrderPDF(order);
-      definirUltimoPedido(order, pdf);
+      pedido = await enviarPedido({
+        cliente: values.name.trim(),
+        telefone: values.phone,
+        tipo: values.orderType,
+        endereco:
+          values.orderType === 'delivery'
+            ? {
+                zipCode: values.address.zipCode ?? '',
+                street: values.address.street ?? '',
+                number: values.address.number ?? '',
+                neighborhood: values.address.neighborhood ?? '',
+                city: values.address.city ?? '',
+              }
+            : undefined,
+        pagamento: {
+          method: values.payment,
+          changeFor:
+            values.payment === 'cash' && values.needsChange
+              ? parseCurrencyToCents(values.changeFor ?? '')
+              : undefined,
+        },
+        observacao: values.notes?.trim() || undefined,
+        itens: items,
+      });
     } catch (erro) {
-      console.error('[pdf] falha ao gerar o comprovante', erro);
-      toast('Não conseguimos gerar o PDF. Tente novamente.', 'error');
+      tratarFalhaNoEnvio(erro);
+      return;
+    }
+
+    try {
+      const documento: OrderDocument = { pedido, settings };
+      const pdf = await generateOrderPDF(documento);
+      definirUltimoPedido(documento, pdf);
+    } catch (erro) {
+      // O pedido já está salvo; só a comanda falhou.
+      console.error('[pdf] falha ao gerar a comanda', erro);
+      toast(
+        `Pedido #${pedido.numero} registrado, mas não conseguimos gerar o PDF.`,
+        'error',
+      );
       return;
     }
 
     orderSent.current = true;
     clearCart();
     navigate('/pedido-enviado', { replace: true });
+  };
+
+  /** Traduz a falha da API em algo acionável para o cliente. */
+  const tratarFalhaNoEnvio = (erro: unknown) => {
+    console.error('[pedido] falha ao enviar', erro);
+
+    if (!(erro instanceof ApiError)) {
+      toast('Não conseguimos enviar seu pedido. Tente novamente.', 'error');
+      return;
+    }
+
+    if (erro.offline) {
+      toast(erro.message, 'error');
+      return;
+    }
+
+    // Produto saiu do cardápio ou ficou indisponível enquanto o cliente montava o pedido.
+    if (erro.status === 404 || erro.status === 409) {
+      toast(`${erro.message} Revise o carrinho.`, 'error');
+      recarregarCardapio();
+      return;
+    }
+
+    if (erro.status === 422 && erro.detalhes?.length) {
+      toast(erro.detalhes[0]!.mensagem, 'error');
+      return;
+    }
+
+    toast(erro.message, 'error');
   };
 
   /**

@@ -31,18 +31,21 @@ export default function OrderSentPage() {
 
   const resumo = useMemo(() => {
     if (!order) return '';
+    const { pedido } = order;
     return montarResumoDaConversa({
-      orderCode: order.orderCode,
-      clienteNome: order.customer.name,
-      quantidadeItens: order.totals.itemCount,
-      total: formatCurrency(order.totals.total),
-      tipo: order.type,
+      orderCode: String(pedido.numero).padStart(3, '0'),
+      clienteNome: pedido.cliente,
+      quantidadeItens: pedido.itens.reduce((total, item) => total + item.quantidade, 0),
+      total: formatCurrency(pedido.valorTotal),
+      tipo: pedido.tipo === 'ENTREGA' ? 'delivery' : 'pickup',
     });
   }, [order]);
 
   if (!order || !pdf) return null;
 
   const podeAnexar = canal === 'compartilhar-arquivo';
+  const numeroComanda = String(order.pedido.numero).padStart(3, '0');
+  const totalItens = order.pedido.itens.reduce((total, item) => total + item.quantidade, 0);
 
   const enviarPeloWhatsApp = async () => {
     setEnviando(true);
@@ -77,22 +80,22 @@ export default function OrderSentPage() {
       <div>
         <h1 className="font-display text-2xl font-extrabold">Pedido pronto!</h1>
         <p className="mt-2 text-sm text-brand-white/60">
-          Geramos o comprovante do pedido{' '}
-          <strong className="text-brand-gold">#{order.orderCode}</strong> em PDF. Agora envie para o
-          WhatsApp do {settings.name} para confirmarmos o preparo.
+          Seu pedido foi registrado como{' '}
+          <strong className="text-brand-gold">comanda #{numeroComanda}</strong>. Agora envie o
+          comprovante para o WhatsApp do {settings.name} para confirmarmos o preparo.
         </p>
       </div>
 
       <div className="card-surface w-full space-y-1.5 p-4 text-left text-sm">
-        <Linha rotulo="Cliente" valor={order.customer.name} />
-        <Linha rotulo="Itens" valor={String(order.totals.itemCount)} />
+        <Linha rotulo="Cliente" valor={order.pedido.cliente} />
+        <Linha rotulo="Itens" valor={String(totalItens)} />
         <Linha
           rotulo="Tipo"
-          valor={order.type === 'delivery' ? 'Entrega' : 'Retirada no balcão'}
+          valor={order.pedido.tipo === 'ENTREGA' ? 'Entrega' : 'Retirada no balcão'}
         />
         <div className="flex justify-between border-t border-surface-border pt-2 font-display text-base font-extrabold">
           <span>Total</span>
-          <span className="text-brand-gold">{formatCurrency(order.totals.total)}</span>
+          <span className="text-brand-gold">{formatCurrency(order.pedido.valorTotal)}</span>
         </div>
       </div>
 
