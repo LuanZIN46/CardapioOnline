@@ -100,14 +100,6 @@ Para trocar a marca: substitua `public/logo.jpg` e rode `npm run icons`.
 O `wa.me` só aceita texto, então o envio usa a Web Share API (celular) ou baixa o
 PDF e abre a conversa (desktop).
 
-## Painel administrativo
-
-Acesse `http://localhost:5173/admin/login`. Usuário criado pelo seed:
-
-| | |
-| --- | --- |
-| E-mail | `admin@bardopardal.com.br` |
-| Senha | `pardal2026` |
 
 Duas telas apenas: **Produtos** e **Categorias**. Alterou o preço e salvou, o
 cardápio público já mostra o novo valor — sem editar arquivo nem fazer deploy.
