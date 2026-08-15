@@ -22,13 +22,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCartTotals } from '@/hooks/use-cart';
 import { useStoreSettings } from '@/hooks/use-catalog';
 import { useStoreStatus } from '@/hooks/use-store-status';
-import {
-  formatCurrency,
-  maskCurrency,
-  maskPhone,
-  maskZipCode,
-  parseCurrencyToCents,
-} from '@/lib/format';
+import { formatCurrency, maskCurrency, maskPhone, parseCurrencyToCents } from '@/lib/format';
 import { itemTotal } from '@/lib/pricing';
 import {
   createCheckoutSchema,
@@ -36,7 +30,6 @@ import {
   type CheckoutFormValues,
 } from '@/lib/validation/checkout.schema';
 import { ApiError } from '@/services/api';
-import { buscarCep, cepCompleto } from '@/services/cep.service';
 import { enviarPedido, type PedidoSalvo } from '@/services/order.service';
 import { generateOrderPDF, type OrderDocument } from '@/services/pdf/orderPdf.service';
 import { getCartTotals } from '@/store/cart.selectors';
@@ -59,8 +52,6 @@ export default function CheckoutPage() {
     void queryClient.invalidateQueries({ queryKey: ['cardapio'] });
   };
   const [etapa, setEtapa] = useState<Etapa>(1);
-  const [dicaDoCep, setDicaDoCep] = useState('');
-  const ultimoCepBuscado = useRef('');
 
   const {
     register,
@@ -68,7 +59,6 @@ export default function CheckoutPage() {
     control,
     watch,
     setValue,
-    setFocus,
     trigger,
     formState: { errors, isSubmitting },
   } = useForm<CheckoutFormValues>({
@@ -76,7 +66,7 @@ export default function CheckoutPage() {
       name: '',
       phone: '',
       orderType: 'delivery',
-      address: { zipCode: '', street: '', number: '', neighborhood: '', city: '' },
+      address: { street: '', number: '', neighborhood: '', city: '' },
       payment: 'pix',
       needsChange: false,
       changeFor: '',
@@ -139,7 +129,6 @@ export default function CheckoutPage() {
         endereco:
           values.orderType === 'delivery'
             ? {
-                zipCode: values.address.zipCode ?? '',
                 street: values.address.street ?? '',
                 number: values.address.number ?? '',
                 neighborhood: values.address.neighborhood ?? '',

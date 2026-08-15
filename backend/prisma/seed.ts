@@ -10,8 +10,13 @@ import { categoriasSeed, gruposAdicionaisSeed, produtosSeed } from './cardapio.j
 
 const EMPRESA_SLUG = 'bar-do-pardal';
 const EMAIL_EMPRESA = 'contato@bardopardal.com.br';
-const EMAIL_ADMIN = 'admin@bardopardal.com.br';
-const SENHA_ADMIN = 'pardal2026';
+const EMAIL_ADMIN = process.env.ADMIN_EMAIL ?? 'admin@bardopardal.com.br';
+/**
+ * Em produção, defina ADMIN_SENHA antes de rodar o seed.
+ * O padrão abaixo serve só para desenvolvimento local — ele está versionado,
+ * então qualquer pessoa com acesso ao repositório o conhece.
+ */
+const SENHA_ADMIN = process.env.ADMIN_SENHA ?? 'pardal2026';
 const TAXA_ENTREGA = 200;
 
 async function main(): Promise<void> {
