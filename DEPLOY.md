@@ -93,7 +93,17 @@ Anote a URL que o Render devolve, algo como `https://cardapio-api.onrender.com`.
 | `VITE_EMPRESA_SLUG` | `bar-do-pardal` |
 
 O `vercel.json` do projeto já cuida do roteamento da SPA — sem ele, recarregar
-`/admin/produtos` daria 404.
+`/admin/produtos` daria 404. O arquivo faz três coisas:
+
+| Regra | Para quê |
+| --- | --- |
+| `rewrites` | Manda as rotas da aplicação para o `index.html`, deixando arquivos reais (`/assets/`, `/icons/`, `/sw.js`) passarem direto |
+| `headers` em `/assets/` | Cache eterno — os nomes já têm hash |
+| `headers` em `/sw.js` | Sem cache, senão o app trava numa versão antiga |
+
+> A Vercel valida esse arquivo de forma estrita e recusa qualquer chave fora do
+> schema — inclusive tentativas de comentar o JSON. Ao editar, use apenas as
+> propriedades documentadas.
 
 4. Publique e copie a URL final.
 
