@@ -10,7 +10,9 @@ export const storeSettings: StoreSettings = {
   phone: '(14) 99644-0787',
   instagram: 'https://instagram.com/bardopardal',
   facebook: 'https://facebook.com/bardopardal',
-  address: 'Rua dos Sabiás, 01 - Esplanada',
+  // O CEP fica só nos dados estruturados do index.html: na comanda de 80mm ele
+  // empurraria o endereço para uma segunda linha, sem serventia para o cliente.
+  address: 'Rua dos Sabiás, 01 - Esplanada, Bastos - SP',
   deliveryFee: 200,
   pixKey: '14996440787',
   deliveryTimeMinutes: { min: 35, max: 50 },
