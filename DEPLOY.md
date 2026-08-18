@@ -59,8 +59,13 @@ A variável vale só para aquela janela do PowerShell; ao abrir outra, defina de
 | Campo | Valor |
 | --- | --- |
 | Root Directory | `backend` |
-| Build Command | `npm install && npm run build` |
+| Build Command | `npm install --include=dev && npm run build` |
 | Start Command | `npx prisma migrate deploy && npm start` |
+
+> O `--include=dev` **não é opcional**. Com `NODE_ENV=production` definido, o npm
+> descarta as devDependencies — e é lá que moram o TypeScript, o Prisma CLI e os
+> `@types/*`. Sem a flag, o build quebra com dezenas de erros
+> `Could not find a declaration file for module 'express'`.
 
 3. Em **Environment**, adicione:
 
