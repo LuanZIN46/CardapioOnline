@@ -7,6 +7,10 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // O projeto roda como ESM puro no Node. Sem a extensão explícita, o client
+  // gerado importa "./internal/class" e o Node se recusa a resolver em runtime
+  // (ERR_MODULE_NOT_FOUND) — o tsc copia o caminho sem reescrever.
+  importFileExtension = "js"
 }
 
 datasource db {
