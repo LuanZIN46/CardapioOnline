@@ -33,15 +33,21 @@ postgresql://usuario:senha@ep-xxx.sa-east-1.aws.neon.tech/neondb?sslmode=require
 
 3. Guarde essa string — ela é a `DATABASE_URL` do próximo passo.
 
-Aplique as migrations e o cardápio inicial a partir da sua máquina, uma única vez:
+Aplique as migrations e o cardápio inicial a partir da sua máquina, uma única vez.
+No **PowerShell** a variável vai numa linha separada:
 
-```bash
-cd backend
-DATABASE_URL="cole-a-string-aqui" npx prisma migrate deploy
-DATABASE_URL="cole-a-string-aqui" npm run seed
+```powershell
+cd D:\Cardapio\backend
+$env:DATABASE_URL="cole-a-string-do-neon-aqui"
+$env:ADMIN_SENHA="escolha-uma-senha-forte"
+npx prisma migrate deploy
+npm run seed
 ```
 
-> No PowerShell use `$env:DATABASE_URL="..."` numa linha separada antes dos comandos.
+`ADMIN_SENHA` define a senha do administrador. Sem ela, o seed usa `pardal2026`,
+que está escrito neste repositório — nunca use esse padrão em produção.
+
+A variável vale só para aquela janela do PowerShell; ao abrir outra, defina de novo.
 
 ---
 
@@ -123,8 +129,9 @@ incomodar, o caminho é trocar o Multer por Cloudinary ou S3 — muda só o
 **O plano gratuito do Render hiberna** após 15 minutos sem uso. A primeira visita
 depois disso demora ~30 segundos. O plano pago mais barato resolve.
 
-**Troque a senha do administrador.** O seed cria `admin@bardopardal.com.br` com
-`pardal2026`, que está escrito neste repositório público.
+**A senha do administrador vem de `ADMIN_SENHA` no momento do seed.** Ainda não
+existe tela para trocá-la depois; para mudar, é preciso rodar o seed de novo com
+a variável nova ou atualizar o hash direto no banco.
 
 **Domínio próprio:** tanto Vercel quanto Render aceitam. Depois de apontar,
 lembre de atualizar `CORS_ORIGINS` e `VITE_API_URL`.
