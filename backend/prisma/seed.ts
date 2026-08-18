@@ -28,7 +28,7 @@ async function main(): Promise<void> {
     create: {
       nome: 'Bar do Pardal',
       slug: EMPRESA_SLUG,
-      telefone: '14998580049',
+      telefone: '14996440787',
       email: EMAIL_EMPRESA,
       taxaEntrega: TAXA_ENTREGA,
       plano: 'PRO',

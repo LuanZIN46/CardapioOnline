@@ -15,7 +15,7 @@ export interface StoreSettings {
   /** Versão reduzida da logo (só o emblema), legível em tamanhos pequenos. */
   logoMarkUrl: string;
   bannerUrl: string;
-  /** Somente dígitos, com DDI e DDD (ex.: 5514998580049). */
+  /** Somente dígitos, com DDI e DDD (ex.: 5514996440787). */
   whatsappNumber: string;
   phone: string;
   instagram?: string;
