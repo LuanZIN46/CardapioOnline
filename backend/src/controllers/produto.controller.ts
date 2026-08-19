@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import * as produtoService from '../services/produto.service.js';
 import { contextoDaRequisicao } from '../middlewares/auth.middleware.js';
 import { idDaRota } from '../utils/params.js';
-import { caminhoPublico } from '../middlewares/upload.middleware.js';
+import * as imagemService from '../services/imagem.service.js';
 import { AppError } from '../utils/AppError.js';
 
 export async function listar(req: Request, res: Response): Promise<void> {
@@ -31,14 +31,21 @@ export async function remover(req: Request, res: Response): Promise<void> {
   res.json(await produtoService.remover(empresaId, idDaRota(req)));
 }
 
-/** Recebe a imagem e grava apenas o caminho público no banco. */
+/** Envia a foto ao Cloudinary e guarda apenas a URL no banco. */
 export async function enviarImagem(req: Request, res: Response): Promise<void> {
   const { empresaId } = contextoDaRequisicao(req);
+  const id = idDaRota(req);
 
   if (!req.file) throw new AppError('Envie um arquivo no campo "imagem".', 400);
 
-  const imagem = caminhoPublico(req.file.filename);
-  const produto = await produtoService.atualizar(empresaId, idDaRota(req), { imagem });
+  // Confere a posse antes de gastar banda: produto de outra empresa nem sobe.
+  const anterior = await produtoService.buscarPorId(empresaId, id);
 
-  res.status(201).json({ imagem, produto });
+  const { url } = await imagemService.enviarImagem(req.file.buffer, empresaId);
+  const produto = await produtoService.atualizar(empresaId, id, { imagem: url });
+
+  // A troca já foi persistida; a foto antiga vira lixo e pode sair.
+  void imagemService.removerImagem(anterior.imagem);
+
+  res.status(201).json({ imagem: url, produto });
 }

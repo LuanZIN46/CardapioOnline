@@ -5,7 +5,6 @@ import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
 import { routes } from './routes/index.js';
 import { rotaNaoEncontrada, tratarErros } from './middlewares/error.middleware.js';
-import { uploadDir } from './middlewares/upload.middleware.js';
 
 export const app = express();
 
@@ -38,9 +37,6 @@ app.use(
     message: { erro: 'Muitas requisições. Aguarde um instante.' },
   }),
 );
-
-// Imagens enviadas pelos estabelecimentos.
-app.use(`/${env.UPLOAD_DIR}`, express.static(uploadDir, { maxAge: '7d', index: false }));
 
 app.use('/api', routes);
 

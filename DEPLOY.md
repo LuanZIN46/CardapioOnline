@@ -136,10 +136,19 @@ Sem esse passo o navegador bloqueia todas as chamadas à API.
 
 ## Pontos de atenção
 
-**As fotos enviadas pelo painel somem a cada deploy.** O Render grava em disco
-efêmero. Enquanto o volume de fotos for pequeno, dá para reenviar; quando
-incomodar, o caminho é trocar o Multer por Cloudinary ou S3 — muda só o
-`upload.middleware.ts`, o resto da aplicação não sente.
+**Fotos dos produtos: configure o Cloudinary.** Crie uma conta gratuita em
+[cloudinary.com](https://cloudinary.com), copie os três valores do Dashboard e
+adicione no Render:
+
+| Variável | Onde achar |
+| --- | --- |
+| `CLOUDINARY_CLOUD_NAME` | Dashboard → Cloud name |
+| `CLOUDINARY_API_KEY` | Dashboard → API Key |
+| `CLOUDINARY_API_SECRET` | Dashboard → API Secret |
+
+Sem elas a API sobe normalmente, mas o envio de fotos responde
+`503 — armazenamento não configurado`. O disco do Render é efêmero, por isso as
+fotos não podem ficar no servidor: cada deploy apagaria tudo.
 
 **O plano gratuito do Render hiberna** após 15 minutos sem uso. A primeira visita
 depois disso demora ~30 segundos. O plano pago mais barato resolve.

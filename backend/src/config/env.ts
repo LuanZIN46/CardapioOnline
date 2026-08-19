@@ -14,6 +14,13 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   UPLOAD_DIR: z.string().default('uploads'),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(5),
+
+  // Cloudinary guarda as fotos dos produtos. São opcionais de propósito: sem
+  // elas a API sobe normalmente e apenas o envio de fotos fica indisponível,
+  // com mensagem clara — em vez de derrubar o serviço inteiro.
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -34,4 +41,7 @@ export const env = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   maxUploadBytes: raw.MAX_UPLOAD_MB * 1024 * 1024,
+  cloudinaryConfigurado: Boolean(
+    raw.CLOUDINARY_CLOUD_NAME && raw.CLOUDINARY_API_KEY && raw.CLOUDINARY_API_SECRET,
+  ),
 } as const;
