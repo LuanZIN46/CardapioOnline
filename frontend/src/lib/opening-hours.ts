@@ -50,10 +50,72 @@ function windowFor(schedule: OpeningHour | undefined, dayOffset: number): Window
   return { start, end, closesAt: schedule.closesAt };
 }
 
-export function getStoreStatus(hours: OpeningHour[], now = new Date()): StoreStatus {
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+
+/** Meia-noite local da data informada, para contar dias inteiros de diferença. */
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function labelForOffset(offset: number, weekday: Weekday): string {
+  if (offset === 0) return 'hoje';
+  if (offset === 1) return 'amanhã';
+  return WEEKDAY_LABELS[weekday].toLowerCase();
+}
+
+/**
+ * Primeira abertura agendada a partir de um instante qualquer.
+ * O rótulo ("hoje", "amanhã") sai da distância até `now`, não até a referência —
+ * durante uma pausa a busca começa na virada do dia, mas quem lê a frase ainda
+ * está em hoje.
+ */
+function nextOpening(
+  byWeekday: Map<Weekday, OpeningHour>,
+  from: Date,
+  now: Date,
+): { schedule: OpeningHour; label: string } | null {
+  const fromWeekday = from.getDay() as Weekday;
+  const fromMinutes = from.getHours() * 60 + from.getMinutes();
+  const dayShift = Math.round((startOfDay(from).getTime() - startOfDay(now).getTime()) / MS_IN_DAY);
+
+  for (let offset = 0; offset < 8; offset += 1) {
+    const weekday = shiftWeekday(fromWeekday, offset);
+    const schedule = byWeekday.get(weekday);
+    if (!schedule || schedule.closed) continue;
+    if (offset === 0 && toMinutes(schedule.opensAt) <= fromMinutes) continue;
+
+    return { schedule, label: labelForOffset(dayShift + offset, weekday) };
+  }
+
+  return null;
+}
+
+/**
+ * Situação da loja agora.
+ *
+ * `pausaAte` é o fechamento avulso do dia decidido no painel. Ele vence sozinho
+ * na virada, então basta compará-lo com o relógio: nunca fica um "fechado"
+ * esquecido de ontem.
+ */
+export function getStoreStatus(
+  hours: OpeningHour[],
+  now = new Date(),
+  pausaAte?: Date | null,
+): StoreStatus {
   const byWeekday = new Map(hours.map((hour) => [hour.weekday, hour]));
   const today = now.getDay() as Weekday;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  if (pausaAte && pausaAte.getTime() > now.getTime()) {
+    const abertura = nextOpening(byWeekday, pausaAte, now);
+    return {
+      isOpen: false,
+      message: abertura
+        ? `Fechado hoje · voltamos ${abertura.label} às ${formatTime(abertura.schedule.opensAt)}`
+        : 'Fechado hoje · voltamos em breve',
+      nextChange: abertura?.schedule.opensAt,
+    };
+  }
 
   const activeWindows = [
     windowFor(byWeekday.get(shiftWeekday(today, -1)), -1),
@@ -72,19 +134,13 @@ export function getStoreStatus(hours: OpeningHour[], now = new Date()): StoreSta
     };
   }
 
-  for (let offset = 0; offset < 8; offset += 1) {
-    const weekday = shiftWeekday(today, offset);
-    const schedule = byWeekday.get(weekday);
-    const window = windowFor(schedule, offset);
-    if (!window || !schedule) continue;
-    if (window.start <= nowMinutes) continue;
+  const abertura = nextOpening(byWeekday, now, now);
 
-    const when =
-      offset === 0 ? 'hoje' : offset === 1 ? 'amanhã' : WEEKDAY_LABELS[weekday].toLowerCase();
+  if (abertura) {
     return {
       isOpen: false,
-      message: `Fechado · abre ${when} às ${formatTime(schedule.opensAt)}`,
-      nextChange: schedule.opensAt,
+      message: `Fechado · abre ${abertura.label} às ${formatTime(abertura.schedule.opensAt)}`,
+      nextChange: abertura.schedule.opensAt,
     };
   }
 

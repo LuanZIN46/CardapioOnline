@@ -13,8 +13,10 @@ const SECTION_OFFSET_PX = 160;
 
 export default function HomePage() {
   const { settings } = useStoreSettings();
-  const status = useStoreStatus(settings.openingHours);
+  const status = useStoreStatus();
   const cardapio = useCardapio();
+  // Fora do horário o pedido pode ser adiantado; no fechamento avulso, não.
+  const fechadoHoje = cardapio.data?.pausa.fechado ?? false;
   const { data: categories = [] } = useCategories();
   const { data: products = [] } = useProducts();
   const carregando = cardapio.isPending;
@@ -94,7 +96,9 @@ export default function HomePage() {
             role="status"
             className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm font-semibold text-red-300"
           >
-            Estamos fechados no momento. Você pode montar seu pedido e enviar quando abrirmos.
+            {fechadoHoje
+              ? `${status.message}. Não estamos recebendo pedidos agora.`
+              : 'Estamos fechados no momento. Você pode montar seu pedido e enviar quando abrirmos.'}
           </p>
         </div>
       )}

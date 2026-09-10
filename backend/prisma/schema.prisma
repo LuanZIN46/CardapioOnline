@@ -66,6 +66,11 @@ model Empresa {
   /// Taxa de entrega em centavos. Fica aqui para o servidor calcular o total
   /// sem depender de nenhum valor enviado pelo navegador.
   taxaEntrega Int      @default(0)
+  /// Pausa manual do atendimento. Guarda o instante em que ela expira — sempre
+  /// a virada do dia em São Paulo. Vazio significa "seguindo o horário normal".
+  /// Como é uma data e não um booleano, a loja reabre sozinha no dia seguinte:
+  /// não existe estado esquecido em `fechado` na segunda-feira de manhã.
+  fechadoAte  DateTime?
   plano       Plano    @default(FREE)
   ativo       Boolean  @default(true)
   createdAt   DateTime @default(now())

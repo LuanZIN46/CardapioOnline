@@ -20,7 +20,7 @@ import { CouponField } from '@/components/checkout/CouponField';
 import { StepIndicator } from '@/components/checkout/StepIndicator';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCartTotals } from '@/hooks/use-cart';
-import { useStoreSettings } from '@/hooks/use-catalog';
+import { useCardapio, useStoreSettings } from '@/hooks/use-catalog';
 import { useStoreStatus } from '@/hooks/use-store-status';
 import { formatCurrency, maskCurrency, maskPhone, parseCurrencyToCents } from '@/lib/format';
 import { itemTotal } from '@/lib/pricing';
@@ -41,7 +41,11 @@ type Etapa = 1 | 2;
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { settings } = useStoreSettings();
-  const status = useStoreStatus(settings.openingHours);
+  const status = useStoreStatus();
+  // Fora do horário o cliente ainda pode adiantar o pedido. Fechamento avulso
+  // é outra coisa: o dono já disse que hoje não vai ter ninguém para preparar.
+  const { data: cardapio } = useCardapio();
+  const fechadoHoje = cardapio?.pausa.fechado ?? false;
   const clearCart = useCartStore((state) => state.clear);
   const couponCode = useCartStore((state) => state.couponCode);
   const definirUltimoPedido = useLastOrderStore((state) => state.definir);
@@ -235,7 +239,9 @@ export default function CheckoutPage() {
           role="status"
           className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
         >
-          Estamos fechados no momento. {status.message}
+          {fechadoHoje
+            ? `${status.message}. Não é possível enviar o pedido agora.`
+            : `Estamos fechados no momento. ${status.message}`}
         </p>
       )}
 
@@ -468,12 +474,14 @@ export default function CheckoutPage() {
           </section>
 
           <div className="space-y-2">
-            <Button type="submit" size="lg" full loading={isSubmitting}>
+            <Button type="submit" size="lg" full loading={isSubmitting} disabled={fechadoHoje}>
               <FileText className="h-5 w-5" aria-hidden />
               {isSubmitting ? 'Gerando comprovante...' : 'Gerar pedido em PDF'}
             </Button>
             <p className="text-center text-xs text-brand-white/40">
-              Na próxima tela você envia o PDF para o WhatsApp do {settings.name}.
+              {fechadoHoje
+                ? 'O pedido volta a ser aceito assim que reabrirmos.'
+                : `Na próxima tela você envia o PDF para o WhatsApp do ${settings.name}.`}
             </p>
           </div>
         </div>

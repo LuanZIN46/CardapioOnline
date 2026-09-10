@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { AppError } from '../utils/AppError.js';
+import { fimDaPausa, pausaEmVigor } from '../lib/funcionamento.js';
 import type { Plano } from '../generated/prisma/enums.js';
 
 interface AtualizarEmpresa {
@@ -53,6 +54,54 @@ export async function atualizar(empresaId: string, dados: AtualizarEmpresa) {
     data: dados,
     select: camposPublicos,
   });
+}
+
+/* -------------------------------------------------------- funcionamento */
+
+export interface Funcionamento {
+  /** True enquanto a pausa manual estiver valendo. */
+  fechado: boolean;
+  /** Quando o atendimento volta ao horário normal, em ISO. */
+  reabreEm: string | null;
+}
+
+function montarFuncionamento(fechadoAte: Date | null, agora = new Date()): Funcionamento {
+  const fechado = pausaEmVigor(fechadoAte, agora);
+  return { fechado, reabreEm: fechado ? fechadoAte!.toISOString() : null };
+}
+
+export async function funcionamento(empresaId: string): Promise<Funcionamento> {
+  const empresa = await prisma.empresa.findUnique({
+    where: { id: empresaId },
+    select: { fechadoAte: true },
+  });
+
+  if (!empresa) throw AppError.naoEncontrado('Empresa');
+
+  return montarFuncionamento(empresa.fechadoAte);
+}
+
+/**
+ * Liga e desliga a pausa manual.
+ *
+ * Fechar grava o fim da pausa, nunca um `true`: assim o prazo é o próprio dado
+ * e a loja reabre na virada sem depender de ninguém lembrar de desmarcar.
+ * Reabrir antes da hora é só limpar a coluna.
+ */
+export async function definirFuncionamento(
+  empresaId: string,
+  fechado: boolean,
+): Promise<Funcionamento> {
+  const agora = new Date();
+  const fechadoAte = fechado ? fimDaPausa(agora) : null;
+
+  const empresa = await prisma.empresa.update({
+    where: { id: empresaId },
+    data: { fechadoAte },
+    select: { fechadoAte: true },
+  });
+
+  return montarFuncionamento(empresa.fechadoAte, agora);
 }
 
 /**

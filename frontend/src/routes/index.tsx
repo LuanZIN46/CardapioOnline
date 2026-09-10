@@ -13,6 +13,7 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const AdminLoginPage = lazy(() => import('@/pages/admin/LoginPage'));
 const ProdutosPage = lazy(() => import('@/pages/admin/ProdutosPage'));
 const CategoriasPage = lazy(() => import('@/pages/admin/CategoriasPage'));
+const FuncionamentoPage = lazy(() => import('@/pages/admin/FuncionamentoPage'));
 
 function PageFallback() {
   return (
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/admin/produtos" replace /> },
       { path: 'produtos', element: withSuspense(<ProdutosPage />) },
       { path: 'categorias', element: withSuspense(<CategoriasPage />) },
+      { path: 'funcionamento', element: withSuspense(<FuncionamentoPage />) },
     ],
   },
   {

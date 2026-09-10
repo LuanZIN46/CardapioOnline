@@ -57,9 +57,25 @@ interface ProdutoApi {
 }
 
 interface CardapioApi {
-  empresa: { id: string; nome: string; taxaEntrega: number };
+  empresa: {
+    id: string;
+    nome: string;
+    taxaEntrega: number;
+    fechado: boolean;
+    reabreEm: string | null;
+  };
   categorias: CategoriaApi[];
   produtos: ProdutoApi[];
+}
+
+/**
+ * Fechamento avulso decidido no painel — o "hoje não abre".
+ * `reabreEm` é a virada do dia: passado esse instante o horário fixo volta a
+ * mandar sozinho, sem ninguém precisar reabrir na mão.
+ */
+export interface PausaAtendimento {
+  fechado: boolean;
+  reabreEm: Date | null;
 }
 
 export interface Cardapio {
@@ -67,6 +83,7 @@ export interface Cardapio {
   products: Product[];
   addonGroups: AddonGroup[];
   deliveryFee: number;
+  pausa: PausaAtendimento;
 }
 
 /* ------------------------------------------------------------- conversão */
@@ -151,6 +168,10 @@ export async function fetchCardapio(): Promise<Cardapio> {
     products: data.produtos.map(converterProduto),
     addonGroups: [...grupos.values()],
     deliveryFee: data.empresa.taxaEntrega,
+    pausa: {
+      fechado: data.empresa.fechado,
+      reabreEm: data.empresa.reabreEm ? new Date(data.empresa.reabreEm) : null,
+    },
   };
 }
 

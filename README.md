@@ -69,6 +69,7 @@ O cardápio abre em `http://localhost:5173`.
 - Carrinho persistente e checkout em duas etapas
 - Comprovante do pedido em PDF no formato de bobina térmica
 - Área administrativa protegida para gerenciar produtos e categorias
+- Botão para fechar o atendimento por um dia, com reabertura automática no dia seguinte
 - Upload de fotos dos produtos
 - Estrutura multiempresa: cada estabelecimento enxerga apenas os próprios dados
 - Instalável como aplicativo (PWA)

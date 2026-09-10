@@ -127,3 +127,26 @@ export async function enviarFoto(id: string, arquivo: File): Promise<string> {
 
   return data.imagem;
 }
+
+/* --------------------------------------------------------- funcionamento */
+
+export interface Funcionamento {
+  /** True enquanto a pausa manual do dia estiver valendo. */
+  fechado: boolean;
+  /** Quando o horário normal volta a valer, em ISO. Nulo quando aberto. */
+  reabreEm: string | null;
+}
+
+export async function buscarFuncionamento(): Promise<Funcionamento> {
+  const { data } = await api.get<Funcionamento>('/empresa/funcionamento');
+  return data;
+}
+
+/**
+ * Manda o estado desejado, não "inverta". Se a resposta se perder no caminho e
+ * o botão for clicado de novo, o resultado é o mesmo.
+ */
+export async function definirFuncionamento(fechado: boolean): Promise<Funcionamento> {
+  const { data } = await api.put<Funcionamento>('/empresa/funcionamento', { fechado });
+  return data;
+}

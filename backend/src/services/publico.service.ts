@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { AppError } from '../utils/AppError.js';
+import { pausaEmVigor } from '../lib/funcionamento.js';
 import type { FormaPagamento, TipoPedido } from '../generated/prisma/enums.js';
 
 /**
@@ -42,7 +43,7 @@ export interface PedidoEntrada {
 async function resolverEmpresa(slug: string) {
   const empresa = await prisma.empresa.findUnique({
     where: { slug },
-    select: { id: true, nome: true, ativo: true, taxaEntrega: true },
+    select: { id: true, nome: true, ativo: true, taxaEntrega: true, fechadoAte: true },
   });
 
   if (!empresa || !empresa.ativo) throw AppError.naoEncontrado('Estabelecimento');
@@ -102,8 +103,18 @@ export async function cardapio(slug: string) {
     }),
   ]);
 
+  const pausado = pausaEmVigor(empresa.fechadoAte);
+
   return {
-    empresa: { id: empresa.id, nome: empresa.nome, taxaEntrega: empresa.taxaEntrega },
+    empresa: {
+      id: empresa.id,
+      nome: empresa.nome,
+      taxaEntrega: empresa.taxaEntrega,
+      // Fechamento avulso do dia. O horário fixo continua sendo conta do
+      // navegador; isto aqui é a exceção que só o estabelecimento conhece.
+      fechado: pausado,
+      reabreEm: pausado ? empresa.fechadoAte!.toISOString() : null,
+    },
     categorias,
     produtos: produtos.map((produto) => ({
       ...produto,
@@ -120,6 +131,15 @@ export async function cardapio(slug: string) {
  */
 export async function criarPedido(slug: string, entrada: PedidoEntrada) {
   const empresa = await resolverEmpresa(slug);
+
+  // Fora do horário normal o cliente ainda pode adiantar o pedido, mas quando o
+  // dono fecha o dia na mão é porque não vai ter ninguém para preparar.
+  if (pausaEmVigor(empresa.fechadoAte)) {
+    throw new AppError(
+      'O estabelecimento está fechado no momento e não está recebendo pedidos.',
+      422,
+    );
+  }
 
   if (entrada.tipo === 'ENTREGA' && !entrada.endereco) {
     throw new AppError('Informe o endereço de entrega.', 422);

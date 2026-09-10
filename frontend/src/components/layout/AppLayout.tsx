@@ -10,7 +10,7 @@ import { useUiStore } from '@/store/ui.store';
 
 export function AppLayout() {
   const { settings } = useStoreSettings();
-  const status = useStoreStatus(settings.openingHours);
+  const status = useStoreStatus();
   const { data: addonGroups = [] } = useAddonGroups();
   const selectedProduct = useUiStore((state) => state.selectedProduct);
   const closeProduct = useUiStore((state) => state.closeProduct);

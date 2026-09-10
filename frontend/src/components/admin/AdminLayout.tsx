@@ -16,6 +16,7 @@ export function RotaProtegida() {
 const ABAS = [
   { para: '/admin/produtos', rotulo: 'Produtos' },
   { para: '/admin/categorias', rotulo: 'Categorias' },
+  { para: '/admin/funcionamento', rotulo: 'Funcionamento' },
 ];
 
 function AdminLayout() {

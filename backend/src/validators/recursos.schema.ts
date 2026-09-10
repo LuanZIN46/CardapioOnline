@@ -19,6 +19,14 @@ export const atualizarEmpresaSchema = z
   })
   .refine((dados) => Object.keys(dados).length > 0, 'Envie ao menos um campo.');
 
+/**
+ * O painel manda o estado desejado, não "inverta o que está aí". Dois cliques
+ * seguidos, ou a mesma requisição repetida, chegam ao mesmo resultado.
+ */
+export const funcionamentoSchema = z.object({
+  fechado: z.boolean(),
+});
+
 /* ------------------------------------------------------------ Categoria */
 
 export const criarCategoriaSchema = z.object({
