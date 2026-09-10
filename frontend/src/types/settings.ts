@@ -19,7 +19,6 @@ export interface StoreSettings {
   whatsappNumber: string;
   phone: string;
   instagram?: string;
-  facebook?: string;
   address: string;
   deliveryFee: Money;
   pixKey: string;

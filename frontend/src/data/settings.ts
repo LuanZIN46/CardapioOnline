@@ -8,8 +8,7 @@ export const storeSettings: StoreSettings = {
   bannerUrl: '/fachada.jpg',
   whatsappNumber: '5514998399710',
   phone: '(14) 99839-9710',
-  instagram: 'https://instagram.com/bardopardal',
-  facebook: 'https://facebook.com/bardopardal',
+  instagram: 'https://www.instagram.com/bar_do_pardal',
   // O CEP fica só nos dados estruturados do index.html: na comanda de 80mm ele
   // empurraria o endereço para uma segunda linha, sem serventia para o cliente.
   address: 'Rua dos Sabiás, 01 - Esplanada, Bastos - SP',

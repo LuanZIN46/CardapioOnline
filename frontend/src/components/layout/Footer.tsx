@@ -1,6 +1,6 @@
 import { Clock, MapPin, Phone } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
-import { FacebookIcon, InstagramIcon } from '@/components/ui/SocialIcons';
+import { InstagramIcon } from '@/components/ui/SocialIcons';
 import { WEEKDAY_LABELS, formatScheduleLine } from '@/lib/opening-hours';
 import type { StoreSettings, Weekday } from '@/types';
 
@@ -28,17 +28,6 @@ export function Footer({ settings }: FooterProps) {
                 className="rounded-lg border border-surface-border p-2 text-brand-white/70 transition-colors hover:border-brand-gold hover:text-brand-gold"
               >
                 <InstagramIcon className="h-4 w-4" />
-              </a>
-            )}
-            {settings.facebook && (
-              <a
-                href={settings.facebook}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Facebook"
-                className="rounded-lg border border-surface-border p-2 text-brand-white/70 transition-colors hover:border-brand-gold hover:text-brand-gold"
-              >
-                <FacebookIcon className="h-4 w-4" />
               </a>
             )}
           </div>
