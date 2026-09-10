@@ -6,15 +6,15 @@ export const storeSettings: StoreSettings = {
   logoUrl: '/logo.jpg',
   logoMarkUrl: '/logo-mark.png',
   bannerUrl: '/fachada.jpg',
-  whatsappNumber: '5514996440787',
-  phone: '(14) 99644-0787',
+  whatsappNumber: '5514998399710',
+  phone: '(14) 99839-9710',
   instagram: 'https://instagram.com/bardopardal',
   facebook: 'https://facebook.com/bardopardal',
   // O CEP fica só nos dados estruturados do index.html: na comanda de 80mm ele
   // empurraria o endereço para uma segunda linha, sem serventia para o cliente.
   address: 'Rua dos Sabiás, 01 - Esplanada, Bastos - SP',
   deliveryFee: 200,
-  pixKey: '14996440787',
+  pixKey: '14998399710',
   deliveryTimeMinutes: { min: 35, max: 50 },
   pickupTimeMinutes: { min: 15, max: 25 },
   // Horário informado pelo estabelecimento: 19h às 23h, todos os dias.
